@@ -108,7 +108,7 @@ pub fn dome(c:BlockPos,r:u32,l:Limits)->Result<Vec<BlockPos>,GeometryError>{
 pub struct BlockChange{pub pos:BlockPos,pub before_state:u32,pub after_state:u32}
 /// Reverse a transaction and merge multiple edits to the same position.
 pub fn undo_order(changes:&[BlockChange],cap:usize)->Result<Vec<BlockChange>,GeometryError>{
-    if changes.len()>cap{return Err(GeometryError::TooManyBlocks)}let mut index=BTreeMap::<BlockPos,usize>::new();let mut out=Vec::new();
+    if changes.len()>cap{return Err(GeometryError::TooManyBlocks)}let mut index=BTreeMap::<BlockPos,usize>::new();let mut out:Vec<BlockChange>=Vec::new();
     for c in changes.iter().rev(){if let Some(&i)=index.get(&c.pos){out[i].after_state=c.before_state}else{index.insert(c.pos,out.len());out.push(BlockChange{pos:c.pos,before_state:c.after_state,after_state:c.before_state})}}Ok(out)
 }
 /// Group positions by 16x16 chunk and cap each output batch.
