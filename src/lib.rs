@@ -242,3 +242,103 @@ mod native_run_tests {
         assert_eq!(runs.len(), 2);
     }
 }
+
+
+/// One decoded block from Horizon API 127's column palette.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SnapshotBlock {
+    pub pos: BlockPos,
+    pub palette_index: u32,
+}
+
+/// Decode the pinned API 127 NativeColumnBlocks layout.
+/// Horizon returns blocks column-by-column, bottom-first, with the first
+/// sampled y at base - below. Every base must be Some: an unloaded column
+/// makes the entire preflight snapshot unsafe and is rejected.
+pub fn decode_column_snapshot(
+    columns: &[(i32, i32)],
+    bases: &[Option<i32>],
+    blocks: &[u16],
+    palette_len: usize,
+    below: u32,
+    above: u32,
+    max_blocks: usize,
+) -> Result<Vec<SnapshotBlock>, GeometryError> {
+    if below.checked_add(above).filter(|n| *n > 0).is_none()
+        || bases.len() != columns.len()
+    {
+        return Err(GeometryError::InvalidBatchSize);
+    }
+    let per = usize::try_from(below + above).map_err(|_| GeometryError::TooManyBlocks)?;
+    let total = columns.len().checked_mul(per).ok_or(GeometryError::TooManyBlocks)?;
+    if total > max_blocks || blocks.len() != total {
+        return Err(GeometryError::TooManyBlocks);
+    }
+    if palette_len == 0 || blocks.iter().any(|&i| usize::from(i) >= palette_len) {
+        return Err(GeometryError::InvalidBatchSize);
+    }
+
+    let mut out = Vec::with_capacity(total);
+    for (column_index, (&(x, z), base)) in columns.iter().zip(bases).enumerate() {
+        let base = base.ok_or(GeometryError::InvalidBatchSize)?;
+        let first_y = i64::from(base) - i64::from(below);
+        let offset = column_index * per;
+        for local_y in 0..per {
+            let y = first_y + local_y as i64;
+            let y = i32::try_from(y).map_err(|_| GeometryError::CoordinateOverflow)?;
+            out.push(SnapshotBlock {
+                pos: BlockPos::new(x, y, z),
+                palette_index: u32::from(blocks[offset + local_y]),
+            });
+        }
+    }
+    Ok(out)
+}
+
+
+#[cfg(test)]
+mod column_snapshot_tests {
+    use super::*;
+
+    #[test]
+    fn decodes_columns_bottom_first_from_base_minus_below() {
+        let columns = [(4, 9), (-2, 3)];
+        let bases = [Some(20), Some(7)];
+        let blocks = [0, 1, 1, 0];
+        let out = decode_column_snapshot(&columns, &bases, &blocks, 2, 1, 1, 8).unwrap();
+        assert_eq!(out, vec![
+            SnapshotBlock { pos:BlockPos::new(4,19,9), palette_index:0 },
+            SnapshotBlock { pos:BlockPos::new(4,20,9), palette_index:1 },
+            SnapshotBlock { pos:BlockPos::new(-2,6,3), palette_index:1 },
+            SnapshotBlock { pos:BlockPos::new(-2,7,3), palette_index:0 },
+        ]);
+    }
+
+    #[test]
+    fn rejects_unloaded_columns_instead_of_treating_them_as_air() {
+        assert_eq!(
+            decode_column_snapshot(&[(0,0)], &[None], &[0], 1, 0, 1, 8),
+            Err(GeometryError::InvalidBatchSize)
+        );
+    }
+
+    #[test]
+    fn rejects_bad_palette_indices_and_incomplete_buffers() {
+        assert_eq!(
+            decode_column_snapshot(&[(0,0)], &[Some(0)], &[1], 1, 0, 1, 8),
+            Err(GeometryError::InvalidBatchSize)
+        );
+        assert_eq!(
+            decode_column_snapshot(&[(0,0)], &[Some(0)], &[], 1, 0, 1, 8),
+            Err(GeometryError::TooManyBlocks)
+        );
+    }
+
+    #[test]
+    fn rejects_snapshot_over_cap() {
+        assert_eq!(
+            decode_column_snapshot(&[(0,0)], &[Some(0)], &[0,0], 1, 1, 1, 1),
+            Err(GeometryError::TooManyBlocks)
+        );
+    }
+}
