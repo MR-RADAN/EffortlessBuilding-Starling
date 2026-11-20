@@ -1,6 +1,6 @@
-//! Effortless Building native integration for Starling 0.8.0.
-//! The screen is a UI-only milestone: tool choice is persisted, but this
-//! module still does not read or modify blocks in the world.
+// Effortless Building native integration for Starling 0.8.0.
+// The screen is a UI-only milestone: tool choice is persisted, but this
+// module still does not read or modify blocks in the world.
 
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
