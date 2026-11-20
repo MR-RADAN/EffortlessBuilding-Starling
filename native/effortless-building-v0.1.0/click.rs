@@ -4,10 +4,8 @@ fn effortless_building_settings_click(
     button: usize,
 ) {
     use crate::game::effortless_building as m;
-    if mod_id != m::ID || button != 0 {
+    if mod_id != m::ID || button >= m::TOOLS.len() {
         return;
     }
-    let current = m::selected_tool(|key| game.native_setting(m::ID, key));
-    let next = (current + 1) % m::TOOLS.len();
-    game.native_set_setting(m::ID, "tool", &next.to_string());
+    game.native_set_setting(m::ID, "tool", &button.to_string());
 }
