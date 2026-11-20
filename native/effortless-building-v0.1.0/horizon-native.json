@@ -4,5 +4,6 @@
   "version": "0.1.0",
   "game": "26.3",
   "horizon": "ac874422ed8f892505ff73d67ae486ecfee7a516",
-  "mixins": "ddd9700b21997c95d95ac6ee5ecafe3830cf622a"
+  "mixins": "ddd9700b21997c95d95ac6ee5ecafe3830cf622a",
+  "hooks": 111
 }
