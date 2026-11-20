@@ -526,3 +526,54 @@ mod guarded_history_tests {
         );
     }
 }
+
+
+#[cfg(test)]
+mod snapshot_transaction_tests {
+    use super::*;
+
+    #[test]
+    fn transaction_requires_snapshot_for_every_target_and_deduplicates_targets() {
+        let a = BlockPos::new(1, 2, 3);
+        let b = BlockPos::new(4, 5, 6);
+        let intended = [a, b, a];
+        let snapshot = [
+            SnapshotBlock { pos: a, palette_index: 7 },
+            SnapshotBlock { pos: b, palette_index: 8 },
+        ];
+        assert_eq!(
+            plan_snapshot_transaction(&intended, &snapshot, 11, 8),
+            Ok(vec![
+                BlockChange { pos: a, before_state: 7, after_state: 11 },
+                BlockChange { pos: b, before_state: 8, after_state: 11 },
+            ])
+        );
+    }
+
+    #[test]
+    fn transaction_rejects_missing_or_duplicate_snapshot_positions() {
+        let a = BlockPos::new(1, 2, 3);
+        assert_eq!(
+            plan_snapshot_transaction(&[a], &[], 9, 8),
+            Err(GeometryError::MissingSnapshot)
+        );
+        let duplicate = [
+            SnapshotBlock { pos: a, palette_index: 2 },
+            SnapshotBlock { pos: a, palette_index: 2 },
+        ];
+        assert_eq!(
+            plan_snapshot_transaction(&[a], &duplicate, 9, 8),
+            Err(GeometryError::InvalidBatchSize)
+        );
+    }
+
+    #[test]
+    fn transaction_enforces_caps_before_planning() {
+        let a = BlockPos::new(1, 2, 3);
+        let snapshot = [SnapshotBlock { pos: a, palette_index: 2 }];
+        assert_eq!(
+            plan_snapshot_transaction(&[a], &snapshot, 9, 0),
+            Err(GeometryError::TooManyBlocks)
+        );
+    }
+}
