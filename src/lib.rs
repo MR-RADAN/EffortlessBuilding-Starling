@@ -125,7 +125,9 @@ pub fn preview_sample(p:&[BlockPos],cap:usize)->Vec<BlockPos>{
 
 #[cfg(test)] mod tests{
  use super::*;const L:Limits=Limits{max_blocks:4096};
- #[test]fn line_includes_endpoints(){let v=line(BlockPos::new(-2,1,0),BlockPos::new(4,3,2),L).unwrap();assert_eq!(v.first(),Some(&BlockPos::new(-2,1,0)));assert_eq!(v.last(),Some(&BlockPos::new(4,3,2)));}\n #[test]fn line_respects_cap(){assert_eq!(line(BlockPos::new(0,0,0),BlockPos::new(100,0,0),Limits{max_blocks:10}),Err(GeometryError::TooManyBlocks));}\n #[test]fn floor_inclusive(){assert_eq!(floor(BlockPos::new(1,0,1),BlockPos::new(3,0,3),L).unwrap().len(),9);}
+ #[test]fn line_includes_endpoints(){let v=line(BlockPos::new(-2,1,0),BlockPos::new(4,3,2),L).unwrap();assert_eq!(v.first(),Some(&BlockPos::new(-2,1,0)));assert_eq!(v.last(),Some(&BlockPos::new(4,3,2)));}
+ #[test]fn line_respects_cap(){assert_eq!(line(BlockPos::new(0,0,0),BlockPos::new(100,0,0),Limits{max_blocks:10}),Err(GeometryError::TooManyBlocks));}
+ #[test]fn floor_inclusive(){assert_eq!(floor(BlockPos::new(1,0,1),BlockPos::new(3,0,3),L).unwrap().len(),9);}
  #[test]fn cube_inclusive(){assert_eq!(cube(BlockPos::new(0,0,0),BlockPos::new(1,2,3),L).unwrap().len(),24);}
  #[test]fn circle_is_flat(){assert!(circle(BlockPos::new(0,5,0),2,L).unwrap().iter().all(|p|p.y==5));}
  #[test]fn cylinder_height(){assert!(cylinder(BlockPos::new(0,2,0),2,3,L).unwrap().iter().all(|p|p.y>=2&&p.y<5));}
