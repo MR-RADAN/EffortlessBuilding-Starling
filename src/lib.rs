@@ -409,3 +409,118 @@ mod column_tests {
         assert_eq!(column(BlockPos::new(0,i32::MAX,0), 2, Limits::default()), Err(GeometryError::CoordinateOverflow));
     }
 }
+
+
+/// Direction for a guarded undo/redo transaction.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TransactionDirection {
+    Undo,
+    Redo,
+}
+
+/// Plan a compare-before-write undo/redo operation.
+///
+/// `recorded` is the original transaction. `current` must be a fresh world
+/// snapshot covering every recorded position. Undo is permitted only when
+/// each current state still equals the recorded after_state; redo is
+/// permitted only when it still equals before_state. This prevents silently
+/// overwriting player edits made after the original operation.
+///
+/// The function is all-or-nothing at planning time: a missing position,
+/// duplicate snapshot entry, stale block, or cap violation returns an error
+/// and no partial plan.
+pub fn plan_guarded_history(
+    recorded: &[BlockChange],
+    current: &[SnapshotBlock],
+    direction: TransactionDirection,
+    cap: usize,
+) -> Result<Vec<BlockChange>, GeometryError> {
+    if recorded.len() > cap || current.len() > cap {
+        return Err(GeometryError::TooManyBlocks);
+    }
+
+    let mut states = BTreeMap::<BlockPos, u32>::new();
+    for item in current {
+        if states.insert(item.pos, item.palette_index).is_some() {
+            return Err(GeometryError::InvalidBatchSize);
+        }
+    }
+
+    let mut seen = BTreeSet::new();
+    let mut plan = Vec::with_capacity(recorded.len());
+    for change in recorded {
+        if !seen.insert(change.pos) {
+            return Err(GeometryError::InvalidBatchSize);
+        }
+        let now = *states.get(&change.pos).ok_or(GeometryError::MissingSnapshot)?;
+        let (expected, target) = match direction {
+            TransactionDirection::Undo => (change.after_state, change.before_state),
+            TransactionDirection::Redo => (change.before_state, change.after_state),
+        };
+        if now != expected {
+            return Err(GeometryError::InvalidBatchSize);
+        }
+        plan.push(BlockChange {
+            pos: change.pos,
+            before_state: now,
+            after_state: target,
+        });
+    }
+    Ok(plan)
+}
+
+#[cfg(test)]
+mod guarded_history_tests {
+    use super::*;
+
+    #[test]
+    fn undo_requires_the_world_to_match_the_recorded_result() {
+        let pos = BlockPos::new(1, 2, 3);
+        let record = [BlockChange { pos, before_state: 4, after_state: 9 }];
+        let current = [SnapshotBlock { pos, palette_index: 9 }];
+        assert_eq!(
+            plan_guarded_history(&record, &current, TransactionDirection::Undo, 8),
+            Ok(vec![BlockChange { pos, before_state: 9, after_state: 4 }])
+        );
+    }
+
+    #[test]
+    fn redo_requires_the_world_to_match_the_original_state() {
+        let pos = BlockPos::new(1, 2, 3);
+        let record = [BlockChange { pos, before_state: 4, after_state: 9 }];
+        let current = [SnapshotBlock { pos, palette_index: 4 }];
+        assert_eq!(
+            plan_guarded_history(&record, &current, TransactionDirection::Redo, 8),
+            Ok(vec![BlockChange { pos, before_state: 4, after_state: 9 }])
+        );
+    }
+
+    #[test]
+    fn stale_world_state_blocks_undo_instead_of_overwriting_player_edits() {
+        let pos = BlockPos::new(1, 2, 3);
+        let record = [BlockChange { pos, before_state: 4, after_state: 9 }];
+        let current = [SnapshotBlock { pos, palette_index: 12 }];
+        assert_eq!(
+            plan_guarded_history(&record, &current, TransactionDirection::Undo, 8),
+            Err(GeometryError::InvalidBatchSize)
+        );
+    }
+
+    #[test]
+    fn missing_or_duplicate_snapshot_entries_are_rejected() {
+        let pos = BlockPos::new(1, 2, 3);
+        let record = [BlockChange { pos, before_state: 4, after_state: 9 }];
+        assert_eq!(
+            plan_guarded_history(&record, &[], TransactionDirection::Undo, 8),
+            Err(GeometryError::MissingSnapshot)
+        );
+        let duplicate = [
+            SnapshotBlock { pos, palette_index: 9 },
+            SnapshotBlock { pos, palette_index: 9 },
+        ];
+        assert_eq!(
+            plan_guarded_history(&record, &duplicate, TransactionDirection::Undo, 8),
+            Err(GeometryError::InvalidBatchSize)
+        );
+    }
+}
