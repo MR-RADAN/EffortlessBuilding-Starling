@@ -76,3 +76,38 @@ Before writing the first executable mixin, inspect the pinned source definitions
 - the server hook's module path and the client screen's module path.
 
 No placeholder .hnmod should be presented as installable until those definitions are resolved and the bundle passes Starling's package validator and build service.
+## Exact helper signatures inspected at the pinned commit
+
+Source files inspected at Horizon commit ac874422ed8f892505ff73d67ae486ecfee7a516:
+- crates/horizon-client/src/game/native_world_edit.rs
+- crates/horizon-client/src/game/native_world_columns.rs
+- crates/horizon-client/src/game/native_hooks.rs
+- native-hooks.json
+
+### Server-side world edit
+
+The exact edit payload is:
+- NativeHeightmap: WorldSurface, MotionBlocking, MotionBlockingNoLeaves, OceanFloor.
+- NativeBlockRun: x, z, y, height, optional surface heightmap, block palette index, optional filter index.
+- NativeBlockEdit: palette: Vec<String>, filters: Vec<String>, runs: Vec<NativeBlockRun>.
+- Helper: Game::native_edit_blocks(&mut self, dimension: &str, edit: &NativeBlockEdit) -> Result<u64, String>.
+
+Important constraints from the source comments: this only edits the authoritative level currently being ticked; unloaded chunks and out-of-column portions are skipped; palette/filter entries with NBT or unreadable expressions are refused; block-entity behavior matches fill strict; neighbours are not notified; changed chunks are sent to players whole. This is not an arbitrary per-block transaction API and cannot by itself preserve original block-entity NBT for undo.
+
+### Column reads
+
+- NativeColumnBlocks contains palette: Vec<String>, bases: Vec<Option<i32>>, blocks: Vec<u16>, and tints: Vec<u32>.
+- native_surface_heights(&self, dimension: &str, columns: &[(i32, i32)], heightmap: NativeHeightmap) -> Result<Vec<Option<i32>>, String>.
+- native_read_columns(&self, dimension: &str, columns: &[(i32, i32)], heightmap: NativeHeightmap, range: (u32, u32)) -> Result<NativeColumnBlocks, String>.
+- The source caps surface-height reads at 65,536 columns and column reads at 1,048,576 blocks; large reads must be split. Unloaded columns return no base / air in the read representation.
+- Tint values are sampled at the column top and may differ from the biome-blended colours rendered near biome borders.
+
+### Screen event wiring
+
+The pinned native-hooks.json exposes these helper targets: mod_screen_open, mod_screen_close, mod_screen; and event hooks screen_render_post, screen_mouse_button_pressed_pre, screen_mouse_scrolled_pre, screen_key_pressed_pre, screen_char_typed_pre. The source signatures use NativeScreenView; render receives &mut HudBatch plus &NativeScreenView; mouse press receives button: i32, modifiers: u32 and &mut canceled; scroll receives [f64; 2], modifiers and &mut canceled; key receives key: &str, repeat: bool, modifiers and &mut canceled; character input receives char, modifiers and &mut canceled.
+
+Screen mouse buttons are GLFW mouse events. The source explicitly says gamepad clicks do not reach mouse hooks. Android touch-to-mouse translation and touch gesture delivery on Starling 0.8.0 have not yet been verified, so this project must not assume the native screen is usable on touch until tested on-device. This is a release blocker for the POCO F5 target.
+
+### Consequence for implementation
+
+The API contract is now concrete enough to design the adapter types, but not enough to safely commit executable hook code: the native hook helper targets are not ordinary public Rust APIs, and the bundle's mixin declaration syntax and module loading still need to be verified against the exact pinned horizon-mixins revision. Undo must also be conservative: snapshot only readable block states, refuse unsupported block entities/NBT, and abort if any requested snapshot column is unloaded or incomplete. No bulk write should occur before the full preflight succeeds.
