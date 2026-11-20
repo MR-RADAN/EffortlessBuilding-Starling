@@ -377,3 +377,35 @@ pub fn plan_snapshot_transaction(
     }
     Ok(changes)
 }
+
+
+/// A vertical rectangular pillar with a one-block footprint.
+pub fn column(base: BlockPos, height: u32, l: Limits) -> Result<Vec<BlockPos>, GeometryError> {
+    if height == 0 { return Err(GeometryError::InvalidHeight); }
+    if height as u64 > l.max_blocks as u64 { return Err(GeometryError::TooManyBlocks); }
+    let top = i64::from(base.y) + i64::from(height) - 1;
+    if top > i64::from(i32::MAX) { return Err(GeometryError::CoordinateOverflow); }
+    let mut out = Vec::with_capacity(height as usize);
+    for dy in 0..height {
+        let y = i64::from(base.y) + i64::from(dy);
+        out.push(BlockPos::new(base.x, i32::try_from(y).map_err(|_| GeometryError::CoordinateOverflow)?, base.z));
+    }
+    Ok(out)
+}
+
+#[cfg(test)]
+mod column_tests {
+    use super::*;
+    #[test]
+    fn column_is_vertical_and_inclusive() {
+        assert_eq!(
+            column(BlockPos::new(-3, 5, 8), 3, Limits { max_blocks: 8 }).unwrap(),
+            vec![BlockPos::new(-3,5,8), BlockPos::new(-3,6,8), BlockPos::new(-3,7,8)]
+        );
+    }
+    #[test]
+    fn column_rejects_zero_height_and_overflow() {
+        assert_eq!(column(BlockPos::new(0,0,0), 0, Limits::default()), Err(GeometryError::InvalidHeight));
+        assert_eq!(column(BlockPos::new(0,i32::MAX,0), 2, Limits::default()), Err(GeometryError::CoordinateOverflow));
+    }
+}
