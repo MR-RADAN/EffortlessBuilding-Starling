@@ -26,3 +26,9 @@ The source-only .hnmod requests native hooks API 111 for the custom mod screen. 
 ## Security
 
 No block-edit API is called by this milestone. World mutation remains disabled until the preview, snapshot validation, authoritative server adapter and explicit confirmation flow are connected and tested.
+
+
+## Native compilation validationA separate GitHub Actions workflow builds the ARM64 native library against
+the exact Starling 0.8.0 release source. See
+[Native Android build validation](../../docs/NATIVE-ANDROID-BUILD.md).
+The source-bundle ZIP check alone is not a native compilation check.
