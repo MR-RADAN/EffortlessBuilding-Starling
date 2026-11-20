@@ -654,3 +654,95 @@ mod native_placement_plan_tests {
         );
     }
 }
+
+
+/// Explicit confirmation gate for a prepared build. Merely preparing or
+/// previewing a plan cannot mutate the world; confirmation consumes it once.
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
+pub struct BuildSession {
+    pending: Option<NativePlacementPlan>,
+}
+
+impl BuildSession {
+    /// Replace any older preview with a freshly validated plan.
+    pub fn preview(&mut self, plan: NativePlacementPlan) {
+        self.pending = Some(plan);
+    }
+
+    /// Cancel leaves no pending edit and returns how many blocks were previewed.
+    pub fn cancel(&mut self) -> usize {
+        self.pending
+            .take()
+            .map(|plan| plan.changes.len())
+            .unwrap_or(0)
+    }
+
+    /// Consume the exact plan the user confirmed. A second confirmation is empty.
+    pub fn confirm(&mut self) -> Option<NativePlacementPlan> {
+        self.pending.take()
+    }
+
+    pub fn preview_count(&self) -> usize {
+        self.pending
+            .as_ref()
+            .map(|plan| plan.changes.len())
+            .unwrap_or(0)
+    }
+
+    pub fn is_pending(&self) -> bool {
+        self.pending.is_some()
+    }
+}
+
+#[cfg(test)]
+mod build_session_tests {
+    use super::*;
+
+    fn plan() -> NativePlacementPlan {
+        let a = BlockPos::new(1, 2, 3);
+        NativePlacementPlan {
+            changes: vec![BlockChange {
+                pos: a,
+                before: 0,
+                after: 4,
+            }],
+            runs: vec![NativeRunPlan {
+                x: 1, z: 3, y: 2, height: 1,
+                surface: None, block: 4, only: None,
+            }],
+            block_palette_index: 4,
+        }
+    }
+
+    #[test]
+    fn preview_does_not_confirm_or_apply_and_cancel_discards_it() {
+        let mut session = BuildSession::default();
+        session.preview(plan());
+        assert!(session.is_pending());
+        assert_eq!(session.preview_count(), 1);
+        assert_eq!(session.cancel(), 1);
+        assert!(!session.is_pending());
+        assert_eq!(session.preview_count(), 0);
+        assert!(session.confirm().is_none());
+    }
+
+    #[test]
+    fn confirmation_consumes_the_preview_exactly_once() {
+        let mut session = BuildSession::default();
+        session.preview(plan());
+        let confirmed = session.confirm().unwrap();
+        assert_eq!(confirmed.block_palette_index, 4);
+        assert!(session.confirm().is_none());
+        assert!(!session.is_pending());
+    }
+
+    #[test]
+    fn a_new_preview_replaces_the_old_unconfirmed_plan() {
+        let mut session = BuildSession::default();
+        session.preview(plan());
+        let mut replacement = plan();
+        replacement.block_palette_index = 8;
+        session.preview(replacement);
+        assert_eq!(session.confirm().unwrap().block_palette_index, 8);
+    }
+}
