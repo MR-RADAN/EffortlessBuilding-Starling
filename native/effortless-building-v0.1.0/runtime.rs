@@ -1,6 +1,6 @@
 //! Effortless Building native integration scaffold for Starling 0.8.0.
-//! This first bundle stage only registers the mod and its settings page.
-//! World edits are intentionally not exposed until their exact hooks compile.
+//! The settings page exposes tool selection; world editing remains gated
+//! until the Starling native edit hooks are wired and compiled.
 
 pub const ID: &str = "effortless_building";
 pub const NAME: &str = "Effortless Building";
@@ -17,11 +17,21 @@ pub fn selected_tool(read: impl Fn(&str) -> Option<String>) -> usize {
 }
 
 pub fn setting_labels(tool: usize) -> Vec<String> {
-    vec![
-        format!("Tool: {}", TOOLS[tool.min(TOOLS.len() - 1)]),
-        "Build preview: not connected yet".to_owned(),
-        "Placement: disabled until native edit hook is verified".to_owned(),
-    ]
+    let selected = tool.min(TOOLS.len() - 1);
+    let mut labels: Vec<String> = TOOLS
+        .iter()
+        .enumerate()
+        .map(|(index, name)| {
+            if index == selected {
+                format!("[x] {name}")
+            } else {
+                format!("[ ] {name}")
+            }
+        })
+        .collect();
+    labels.push("Preview: not connected yet".to_owned());
+    labels.push("Placement: locked until native hook validation".to_owned());
+    labels
 }
 
 #[cfg(test)]
@@ -34,6 +44,17 @@ mod tests {
         assert_eq!(selected_tool(|_| Some("3".into())), 3);
         assert_eq!(selected_tool(|_| Some("4".into())), 0);
         assert_eq!(selected_tool(|_| Some("-1".into())), 0);
-        assert_eq!(setting_labels(3)[0], "Tool: Cube");
+    }
+
+    #[test]
+    fn settings_show_all_four_tools_and_mark_selection() {
+        let labels = setting_labels(2);
+        assert_eq!(labels.len(), 6);
+        assert_eq!(&labels[..4], ["[ ] Floor", "[ ] Wall", "[x] Pillar", "[ ] Cube"]);
+    }
+
+    #[test]
+    fn settings_clamp_invalid_selection() {
+        assert_eq!(setting_labels(99)[3], "[x] Cube");
     }
 }
