@@ -25,7 +25,7 @@ These routines do not access the game world. The preview sampler is not a placem
 - Horizon: ac874422ed8f892505ff73d67ae486ecfee7a516
 - horizon-mixins: ddd9700b21997c95d95ac6ee5ecafe3830cf622a
 
-Do not substitute newer template pins without checking the installed Starling build. The pinned Mixins parser and support-module rules are documented in [the bundle contract](docs/PINNED-MIXINS-BUNDLE-CONTRACT.md).
+Do not substitute newer template pins without checking the installed Starling build. The pinned Mixins parser and support-module rules are documented in [the bundle contract](docs/PINNED-MIXINS-BUNDLE-CONTRACT.md); Starling's actual build-service Mixins pin is confirmed in [the build-service compatibility audit](docs/BUILD-SERVICE-COMPATIBILITY.md).
 
 ## Not yet implemented
 
