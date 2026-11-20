@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a deterministic Starling native .hnmod package (stdlib only)."""
+"""Build a deterministic Starling native .hnmod package (Python standard library only)."""
 from __future__ import annotations
 import json
 import pathlib
@@ -9,20 +9,23 @@ import zipfile
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 VERSION = "0.1.0"
 MOD_ID = "effortless_building"
-SOURCE = ROOT / "native" / f"{MOD_ID}-v{VERSION}"
+SOURCE = ROOT / "native" / f"effortless-building-v{VERSION}"
 OUTPUT = ROOT / "dist" / f"{MOD_ID}-{VERSION}.hnmod"
 
-REQUIRED = (
-    "horizon-native.json",
-    "mixins/effortless_building/horizon-mixin.toml",
-    "mixins/effortless_building/runtime.rs",
-    "mixins/effortless_building/list.rs",
-    "mixins/effortless_building/settings.rs",
-    "mixins/effortless_building/click.rs",
+SOURCE_FILES = (
+    "horizon-mixin.toml",
+    "runtime.rs",
+    "list.rs",
+    "settings.rs",
+    "click.rs",
 )
+PACKAGE_PATHS = {
+    "horizon-native.json": "horizon-native.json",
+    **{f"mixins/{MOD_ID}/{name}": name for name in SOURCE_FILES},
+}
 
 def main() -> int:
-    missing = [p for p in REQUIRED if not (SOURCE / p).is_file()]
+    missing = [name for name in ("horizon-native.json", *SOURCE_FILES) if not (SOURCE / name).is_file()]
     if missing:
         print("Missing package inputs:", *missing, sep="\n  ", file=sys.stderr)
         return 2
@@ -32,20 +35,22 @@ def main() -> int:
         raise SystemExit("horizon-native.json id/version does not match package constants")
 
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(OUTPUT, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
-        for relative in REQUIRED:
-            info = zipfile.ZipInfo(relative, date_time=(2020, 1, 1, 0, 0, 0))
+    with zipfile.ZipFile(OUTPUT, "w") as archive:
+        for package_name, source_name in PACKAGE_PATHS.items():
+            info = zipfile.ZipInfo(package_name, date_time=(2020, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o100644 << 16
-            zf.writestr(info, (SOURCE / relative).read_bytes())
+            archive.writestr(info, (SOURCE / source_name).read_bytes(), compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
 
-    with zipfile.ZipFile(OUTPUT, "r") as zf:
-        names = set(zf.namelist())
-        if names != set(REQUIRED) or zf.testzip() is not None:
-            raise SystemExit("Package validation failed")
+    with zipfile.ZipFile(OUTPUT, "r") as archive:
+        if set(archive.namelist()) != set(PACKAGE_PATHS) or archive.testzip() is not None:
+            raise SystemExit("Package ZIP validation failed")
+        packaged_metadata = json.loads(archive.read("horizon-native.json"))
+        if packaged_metadata != metadata:
+            raise SystemExit("Packaged metadata differs from source metadata")
+
     print(f"Created {OUTPUT}")
-    print(f"Entries: {len(REQUIRED)}")
-    print(f"Size: {OUTPUT.stat().st_size} bytes")
+    print(f"Validated {len(PACKAGE_PATHS)} entries; {OUTPUT.stat().st_size} bytes")
     return 0
 
 if __name__ == "__main__":
