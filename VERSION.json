@@ -1,0 +1,14 @@
+{
+  "name": "Effortless Building - Starling Edition",
+  "id": "effortless_building_mr",
+  "version": "1.2.0",
+  "creator_and_port_maintainer": "MR",
+  "upstream_mod_author": "Requios",
+  "upstream_license": "LGPL-3.0-or-later",
+  "target": "Starling 0.8.0 / Horizon ARM64",
+  "horizon_revision": "ac874422ed8f892505ff73d67ae486ecfee7a516",
+  "horizon_mixins_revision": "ddd9700b21997c95d95ac6ee5ecafe3830cf622a",
+  "status": "source prototype; not yet a validated or installable hnmod",
+  "implemented_core": ["line", "wall", "floor", "cuboid", "circle", "cylinder", "sphere", "pyramid", "cone", "dome", "bounded undo planning", "chunk-aware batches", "bounded preview sampling"],
+  "integration_status": "game hooks, native screen, inventory handling, server-authoritative edits and packaging remain unimplemented"
+}
