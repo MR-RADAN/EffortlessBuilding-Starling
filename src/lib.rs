@@ -22,6 +22,37 @@ fn finish(v:impl IntoIterator<Item=BlockPos>,l:Limits)->Result<Vec<BlockPos>,Geo
     let s:BTreeSet<_>=v.into_iter().collect(); if s.len()>l.max_blocks{return Err(GeometryError::TooManyBlocks)} Ok(s.into_iter().collect())
 }
 
+/// Integer 3D Bresenham line, including both endpoints.
+pub fn line(a:BlockPos,b:BlockPos,l:Limits)->Result<Vec<BlockPos>,GeometryError>{
+    let (mut x,mut y,mut z)=(i64::from(a.x),i64::from(a.y),i64::from(a.z));
+    let (x2,y2,z2)=(i64::from(b.x),i64::from(b.y),i64::from(b.z));
+    let (dx,dy,dz)=((x2-x).abs(),(y2-y).abs(),(z2-z).abs());
+    if dx.max(dy).max(dz)+1 > l.max_blocks as i64 { return Err(GeometryError::TooManyBlocks); }
+    let (xs,ys,zs)=((x2-x).signum(),(y2-y).signum(),(z2-z).signum());
+    let mut out=Vec::new();
+    let mut put=|x:i64,y:i64,z:i64| { out.push(BlockPos::new(x as i32,y as i32,z as i32)); };
+    if dx>=dy && dx>=dz {
+        let(mut p1,mut p2)=(2*dy-dx,2*dz-dx);
+        for _ in 0..=dx { put(x,y,z); if x==x2{break}
+            if p1>=0{y+=ys;p1-=2*dx} if p2>=0{z+=zs;p2-=2*dx}
+            x+=xs;p1+=2*dy;p2+=2*dz;
+        }
+    } else if dy>=dx && dy>=dz {
+        let(mut p1,mut p2)=(2*dx-dy,2*dz-dy);
+        for _ in 0..=dy { put(x,y,z); if y==y2{break}
+            if p1>=0{x+=xs;p1-=2*dy} if p2>=0{z+=zs;p2-=2*dy}
+            y+=ys;p1+=2*dx;p2+=2*dz;
+        }
+    } else {
+        let(mut p1,mut p2)=(2*dy-dz,2*dx-dz);
+        for _ in 0..=dz { put(x,y,z); if z==z2{break}
+            if p1>=0{y+=ys;p1-=2*dz} if p2>=0{x+=xs;p2-=2*dz}
+            z+=zs;p1+=2*dy;p2+=2*dx;
+        }
+    }
+    finish(out,l)
+}
+
 /// Filled axis-aligned cuboid, inclusive at both corners.
 pub fn cube(a:BlockPos,b:BlockPos,l:Limits)->Result<Vec<BlockPos>,GeometryError>{
     let (x0,x1)=(a.x.min(b.x),a.x.max(b.x)); let (y0,y1)=(a.y.min(b.y),a.y.max(b.y)); let (z0,z1)=(a.z.min(b.z),a.z.max(b.z));
@@ -94,7 +125,7 @@ pub fn preview_sample(p:&[BlockPos],cap:usize)->Vec<BlockPos>{
 
 #[cfg(test)] mod tests{
  use super::*;const L:Limits=Limits{max_blocks:4096};
- #[test]fn floor_inclusive(){assert_eq!(floor(BlockPos::new(1,0,1),BlockPos::new(3,0,3),L).unwrap().len(),9);}
+ #[test]fn line_includes_endpoints(){let v=line(BlockPos::new(-2,1,0),BlockPos::new(4,3,2),L).unwrap();assert_eq!(v.first(),Some(&BlockPos::new(-2,1,0)));assert_eq!(v.last(),Some(&BlockPos::new(4,3,2)));}\n #[test]fn line_respects_cap(){assert_eq!(line(BlockPos::new(0,0,0),BlockPos::new(100,0,0),Limits{max_blocks:10}),Err(GeometryError::TooManyBlocks));}\n #[test]fn floor_inclusive(){assert_eq!(floor(BlockPos::new(1,0,1),BlockPos::new(3,0,3),L).unwrap().len(),9);}
  #[test]fn cube_inclusive(){assert_eq!(cube(BlockPos::new(0,0,0),BlockPos::new(1,2,3),L).unwrap().len(),24);}
  #[test]fn circle_is_flat(){assert!(circle(BlockPos::new(0,5,0),2,L).unwrap().iter().all(|p|p.y==5));}
  #[test]fn cylinder_height(){assert!(cylinder(BlockPos::new(0,2,0),2,3,L).unwrap().iter().all(|p|p.y>=2&&p.y<5));}
