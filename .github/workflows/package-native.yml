@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "native/effortless_building-v0.1.0/**"
+      - "native/effortless-building-v0.1.0/**"
       - "scripts/package_native.py"
       - ".github/workflows/package-native.yml"
   workflow_dispatch:
