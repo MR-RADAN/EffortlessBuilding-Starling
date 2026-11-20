@@ -51,3 +51,28 @@ Do not assume API 126 alone provides a complete reversible transaction. Its docu
 4. Validate the .hnmod package.
 5. Compile through Starling's build service for ARM64.
 6. Test on the POCO F5: preview, cancel, confirm, all shapes, undo/redo, inventory use, and touch controls.
+
+## Bundle format and hook requirements verified
+
+The pinned Horizon documentation confirms that the native bundle is not a plain Cargo crate and is not just a horizon-mixin.toml archive. The .hnmod package includes a horizon-native.json metadata file alongside the mixin manifest and Rust helper files. Native hook bundles declare their required hook API in that metadata as hooks: N.
+
+For this target, the minimum hook API requirements are:
+- hooks: 111 for a client-owned native screen. It opens over the world, does not pause single-player, and must be drawn and operated through the normal screen hooks. The API explicitly says a gamepad can close it but cannot click it.
+- hooks: 126 for the server-side native_edit_blocks(dimension, edit) bulk-edit hook.
+- hooks: 127 for server-side native_surface_heights and native_read_columns.
+
+Therefore the first package must declare at least hook API 127 if it uses all three capabilities. This is a minimum compatibility declaration, not proof that the mod compiles: exact helper signatures, module destinations, event fields, and hook bindings still need to be checked against the pinned source before a manifest is committed.
+
+## Important version-drift finding
+
+The current horizon-rust/horizon-mods examples are not safe templates for this release unless individually audited: their example manifest pins a newer Horizon revision. In particular, the current Coordinates HUD example demonstrates the general horizon-mixin.toml structure, but it is pinned to a different commit and cannot be copied as a Starling 0.8.0 implementation. This project will use only the pinned 0.8.0 source and compatible hook definitions.
+
+## Next implementation gate
+
+Before writing the first executable mixin, inspect the pinned source definitions for:
+- the exact native screen render/click/scroll/key/typing hook signatures and their bindings;
+- the exact native_edit_blocks edit structure and block-state representation;
+- the exact column-read return type and palette indexing;
+- the server hook's module path and the client screen's module path.
+
+No placeholder .hnmod should be presented as installable until those definitions are resolved and the bundle passes Starling's package validator and build service.
