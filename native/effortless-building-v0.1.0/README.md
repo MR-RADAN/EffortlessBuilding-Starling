@@ -1,23 +1,25 @@
-# Effortless Building — native scaffold 0.1.0
+# Effortless Building — native bundle 0.1.0
 
-This directory is the first native integration scaffold for Starling 0.8.0.
+Maintainer: MR
 
-- Bundle ID: `effortless_building`
-- Version: `0.1.0`
-- Author/maintainer: MR
-- Target Horizon revision: `ac874422ed8f892505ff73d67ae486ecfee7a516`
+This source bundle targets Starling 0.8.0 / Horizon 26.3.
 
-## What this stage implements
+## Package layout
 
-- A native mod entry in Options > Mods.
-- A settings page with a selectable tool label: Floor, Wall, Pillar or Cube.
-- The selected tool index is persisted with Starling's native per-mod setting helper.
+The eventual `.hnmod` must contain:
+- `horizon-native.json`
+- `mixins/effortless_building/horizon-mixin.toml`
+- `mixins/effortless_building/*.rs`
 
-## What it does not implement yet
+The manifest pins the exact Horizon and horizon-mixins revisions used by Starling 0.8.0.
 
-- No world read or block placement is called.
-- No preview, confirmation, undo or redo is wired.
-- The settings page explicitly says placement is disabled.
-- This scaffold has not yet been passed through Starling's v0.8.0 build service or tested in-game.
+## Current functionality
 
-It is deliberately non-destructive: importing or enabling this stage cannot modify a world.
+The mixin registers the mod in Options > Mods and exposes a persisted tool selector:
+Floor, Wall, Pillar, Cube.
+
+This is a registration-only prototype. It does not yet read or edit the world, render a spatial preview, or implement confirmation/undo/redo. Do not treat it as a finished building mod.
+
+## Security
+
+Native mods are compiled into the game and run with the game's full privileges. Review source before compiling. This prototype has no network, filesystem, or world-edit behavior beyond Starling's built-in settings helper.
