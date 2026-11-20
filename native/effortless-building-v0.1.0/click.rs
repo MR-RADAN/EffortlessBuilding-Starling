@@ -4,8 +4,13 @@ fn effortless_building_settings_click(
     button: usize,
 ) {
     use crate::game::effortless_building as m;
-    if mod_id != m::ID || button >= m::TOOLS.len() {
+    if mod_id != m::ID {
         return;
     }
-    game.native_set_setting(m::ID, "tool", &button.to_string());
+
+    if button < m::TOOLS.len() {
+        game.native_set_setting(m::ID, "tool", &button.to_string());
+    } else if button == m::TOOLS.len() {
+        let _ = game.native_mod_screen_open(m::ID);
+    }
 }
