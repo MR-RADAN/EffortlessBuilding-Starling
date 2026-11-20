@@ -18,6 +18,10 @@ SOURCE_FILES = (
     "list.rs",
     "settings.rs",
     "click.rs",
+    "screen.rs",
+    "screen_click.rs",
+    "screen_release.rs",
+    "tick.rs",
 )
 PACKAGE_PATHS = {
     "horizon-native.json": "horizon-native.json",
@@ -33,6 +37,8 @@ def main() -> int:
     metadata = json.loads((SOURCE / "horizon-native.json").read_text(encoding="utf-8"))
     if metadata.get("id") != MOD_ID or metadata.get("version") != VERSION:
         raise SystemExit("horizon-native.json id/version does not match package constants")
+    if metadata.get("hooks") != 111:
+        raise SystemExit("UI bundle requires native hooks API 111 (custom mod screen)")
 
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(OUTPUT, "w") as archive:
