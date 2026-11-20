@@ -8,7 +8,7 @@
 
 ## Current state
 
-This repository contains the versioned project scaffold, a standalone Rust geometry/transaction core, a pinned Starling/Horizon API audit, and the verified horizon-mixins bundle-manifest contract. It remains a source prototype: it has **not** been compiled, packaged as an .hnmod, or tested in Starling.
+This repository contains the versioned project scaffold, a standalone Rust geometry/transaction core, a pinned Starling/Horizon API audit, and the verified `.hnmod` importer schema, and a safety contract for authoritative world edits. It remains a source prototype: it has **not** been compiled, packaged as an .hnmod, or tested in Starling.
 
 ## Implemented in the pure Rust core
 
@@ -32,7 +32,7 @@ Do not substitute newer template pins without checking the installed Starling bu
 - Executable Horizon native hook declarations and world read/write adapter.
 - Native screen, touch-input isolation and mobile controls integration.
 - Inventory accounting and authoritative Unlimited Blocks behavior.
-- Persistent undo/redo snapshots and conflict checks.
+- Live world snapshots, undo/redo persistence and conflict checks.
 - Final .hnmod package, build-service compilation and in-game tests.
 
-See [the porting status](docs/PORTING-STATUS.md) and [license notice](LICENSE-NOTICE.md).
+See the [world-edit adapter contract](docs/WORLD-EDIT-ADAPTER-CONTRACT.md), [import schema audit](docs/HNMOD-IMPORT-SCHEMA.md), [porting status](docs/PORTING-STATUS.md) and [license notice](LICENSE-NOTICE.md).
