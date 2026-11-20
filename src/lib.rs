@@ -134,3 +134,111 @@ pub fn preview_sample(p:&[BlockPos],cap:usize)->Vec<BlockPos>{
  #[test]fn chunks_handle_negative_coordinates(){let p=[BlockPos::new(-1,0,-1),BlockPos::new(16,0,0)];assert_eq!(chunk_batches(&p,8).unwrap().len(),2);}
  #[test]fn preview_is_bounded(){let p=(0..100).map(|x|BlockPos::new(x,0,0)).collect::<Vec<_>>();assert_eq!(preview_sample(&p,8).len(),8);}
 }
+
+
+/// Horizon API 126-compatible vertical run, without importing Horizon crates.
+/// The field names and integer widths mirror NativeBlockRun at the pinned
+/// Starling 0.8.0 Horizon revision. Surface-relative runs are intentionally
+/// not emitted: all y coordinates are absolute and preflighted by the caller.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NativeRunPlan {
+    pub x: i32,
+    pub z: i32,
+    pub y: i32,
+    pub height: u32,
+    pub surface: Option<NativeHeightmapPlan>,
+    pub block: u32,
+    pub only: Option<u32>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NativeHeightmapPlan {
+    WorldSurface,
+    MotionBlocking,
+    MotionBlockingNoLeaves,
+    OceanFloor,
+}
+
+/// Convert an arbitrary set of absolute positions into vertical runs for one
+/// palette entry. Duplicate positions collapse. Runs never bridge gaps or
+/// cross columns. Input size and output run count are both bounded.
+pub fn native_runs(
+    positions: &[BlockPos],
+    block: u32,
+    max_positions: usize,
+    max_runs: usize,
+) -> Result<Vec<NativeRunPlan>, GeometryError> {
+    if positions.len() > max_positions {
+        return Err(GeometryError::TooManyBlocks);
+    }
+    let mut sorted = positions.to_vec();
+    sorted.sort_unstable_by_key(|p| (p.x, p.z, p.y));
+    sorted.dedup();
+
+    let mut out = Vec::new();
+    let mut iter = sorted.into_iter().peekable();
+    while let Some(start) = iter.next() {
+        let mut height = 1u32;
+        let mut last_y = start.y;
+        while let Some(next) = iter.peek() {
+            if next.x == start.x && next.z == start.z
+                && i64::from(next.y) == i64::from(last_y) + 1
+            {
+                last_y = next.y;
+                height = height.checked_add(1).ok_or(GeometryError::CoordinateOverflow)?;
+                iter.next();
+            } else {
+                break;
+            }
+        }
+        out.push(NativeRunPlan {
+            x: start.x, z: start.z, y: start.y, height,
+            surface: None, block, only: None,
+        });
+        if out.len() > max_runs {
+            return Err(GeometryError::TooManyBlocks);
+        }
+    }
+    Ok(out)
+}
+
+
+#[cfg(test)]
+mod native_run_tests {
+    use super::*;
+
+    #[test]
+    fn native_runs_coalesce_only_contiguous_vertical_positions() {
+        let p = [
+            BlockPos::new(2, 8, 4), BlockPos::new(2, 6, 4),
+            BlockPos::new(2, 7, 4), BlockPos::new(2, 10, 4),
+            BlockPos::new(3, 6, 4),
+        ];
+        let runs = native_runs(&p, 7, 16, 16).unwrap();
+        assert_eq!(runs, vec![
+            NativeRunPlan { x:2, z:4, y:6, height:3, surface:None, block:7, only:None },
+            NativeRunPlan { x:2, z:4, y:10, height:1, surface:None, block:7, only:None },
+            NativeRunPlan { x:3, z:4, y:6, height:1, surface:None, block:7, only:None },
+        ]);
+    }
+
+    #[test]
+    fn native_runs_deduplicate_positions() {
+        let p = [BlockPos::new(-1, 0, 2), BlockPos::new(-1, 0, 2)];
+        assert_eq!(native_runs(&p, 0, 8, 8).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn native_runs_respect_input_and_run_caps() {
+        let p = [BlockPos::new(0, 0, 0), BlockPos::new(1, 0, 0)];
+        assert_eq!(native_runs(&p, 0, 1, 8), Err(GeometryError::TooManyBlocks));
+        assert_eq!(native_runs(&p, 0, 8, 1), Err(GeometryError::TooManyBlocks));
+    }
+
+    #[test]
+    fn native_runs_handle_signed_y_boundaries_without_overflow() {
+        let p = [BlockPos::new(0, i32::MAX, 0), BlockPos::new(0, i32::MIN, 0)];
+        let runs = native_runs(&p, 1, 8, 8).unwrap();
+        assert_eq!(runs.len(), 2);
+    }
+}
