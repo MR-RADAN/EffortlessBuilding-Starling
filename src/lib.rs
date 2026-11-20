@@ -577,3 +577,80 @@ mod snapshot_transaction_tests {
         );
     }
 }
+
+
+/// Complete, side-effect-free placement plan. The caller still must validate
+/// the palette string against the live registry and invoke Horizon's
+/// authoritative native_edit_blocks only after an explicit user confirmation.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativePlacementPlan {
+    pub changes: Vec<BlockChange>,
+    pub runs: Vec<NativeRunPlan>,
+    pub block_palette_index: u32,
+}
+
+/// Join geometry, a fresh pre-edit snapshot, and Horizon-compatible vertical
+/// runs into one bounded plan. This function never reads or changes the world.
+pub fn plan_native_placement(
+    intended: &[BlockPos],
+    snapshot: &[SnapshotBlock],
+    block_palette_index: u32,
+    cap: usize,
+    max_runs: usize,
+) -> Result<NativePlacementPlan, GeometryError> {
+    let changes = plan_snapshot_transaction(intended, snapshot, block_palette_index, cap)?;
+    let positions = changes.iter().map(|change| change.pos).collect::<Vec<_>>();
+    let runs = native_runs(&positions, block_palette_index, cap, max_runs)?;
+    Ok(NativePlacementPlan {
+        changes,
+        runs,
+        block_palette_index,
+    })
+}
+
+#[cfg(test)]
+mod native_placement_plan_tests {
+    use super::*;
+
+    #[test]
+    fn placement_plan_combines_snapshot_validation_and_vertical_runs() {
+        let a = BlockPos::new(2, 4, 8);
+        let b = BlockPos::new(2, 5, 8);
+        let c = BlockPos::new(3, 4, 8);
+        let intended = [a, b, c];
+        let snapshot = [
+            SnapshotBlock { pos: a, palette_index: 1 },
+            SnapshotBlock { pos: b, palette_index: 2 },
+            SnapshotBlock { pos: c, palette_index: 3 },
+        ];
+        let plan = plan_native_placement(&intended, &snapshot, 9, 16, 16).unwrap();
+        assert_eq!(plan.changes.len(), 3);
+        assert_eq!(plan.runs.len(), 2);
+        assert_eq!(plan.runs[0].height, 2);
+        assert_eq!(plan.runs[1].height, 1);
+        assert_eq!(plan.block_palette_index, 9);
+    }
+
+    #[test]
+    fn placement_plan_rejects_missing_snapshot_before_any_runs_are_created() {
+        let a = BlockPos::new(2, 4, 8);
+        assert_eq!(
+            plan_native_placement(&[a], &[], 9, 16, 16),
+            Err(GeometryError::MissingSnapshot)
+        );
+    }
+
+    #[test]
+    fn placement_plan_obeys_run_cap() {
+        let a = BlockPos::new(2, 4, 8);
+        let b = BlockPos::new(3, 4, 8);
+        let snapshot = [
+            SnapshotBlock { pos: a, palette_index: 1 },
+            SnapshotBlock { pos: b, palette_index: 1 },
+        ];
+        assert_eq!(
+            plan_native_placement(&[a, b], &snapshot, 9, 16, 1),
+            Err(GeometryError::TooManyBlocks)
+        );
+    }
+}
