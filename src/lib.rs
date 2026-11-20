@@ -7,7 +7,7 @@ pub struct BlockPos { pub x: i32, pub y: i32, pub z: i32 }
 impl BlockPos { pub const fn new(x:i32,y:i32,z:i32)->Self { Self{x,y,z} } }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum GeometryError { InvalidRadius, InvalidHeight, InvalidBatchSize, TooManyBlocks, CoordinateOverflow }
+pub enum GeometryError { InvalidRadius, InvalidHeight, InvalidBatchSize, TooManyBlocks, CoordinateOverflow, MissingSnapshot }
 #[derive(Clone, Copy, Debug)]
 pub struct Limits { pub max_blocks: usize }
 impl Default for Limits { fn default()->Self { Self{max_blocks:16_384} } }
@@ -341,4 +341,39 @@ mod column_snapshot_tests {
             Err(GeometryError::TooManyBlocks)
         );
     }
+}
+
+
+/// Build a placement transaction only when every intended position has a
+/// corresponding decoded pre-edit state. The returned before_state values are
+/// palette indices from the same API 127 snapshot; callers must persist the
+/// associated palette strings alongside the transaction.
+pub fn plan_snapshot_transaction(
+    intended: &[BlockPos],
+    snapshot: &[SnapshotBlock],
+    after_state: u32,
+    cap: usize,
+) -> Result<Vec<BlockChange>, GeometryError> {
+    if intended.len() > cap || snapshot.len() > cap {
+        return Err(GeometryError::TooManyBlocks);
+    }
+    let mut before = BTreeMap::<BlockPos, u32>::new();
+    for item in snapshot {
+        if before.insert(item.pos, item.palette_index).is_some() {
+            return Err(GeometryError::InvalidBatchSize);
+        }
+    }
+    let mut seen = BTreeSet::new();
+    let mut changes = Vec::with_capacity(intended.len());
+    for &pos in intended {
+        if !seen.insert(pos) {
+            continue;
+        }
+        let before_state = *before.get(&pos).ok_or(GeometryError::MissingSnapshot)?;
+        changes.push(BlockChange { pos, before_state, after_state });
+    }
+    if changes.len() > cap {
+        return Err(GeometryError::TooManyBlocks);
+    }
+    Ok(changes)
 }
