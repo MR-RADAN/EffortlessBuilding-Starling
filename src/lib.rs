@@ -703,8 +703,8 @@ mod build_session_tests {
         NativePlacementPlan {
             changes: vec![BlockChange {
                 pos: a,
-                before: 0,
-                after: 4,
+                before_state: 0,
+                after_state: 4,
             }],
             runs: vec![NativeRunPlan {
                 x: 1, z: 3, y: 2, height: 1,
