@@ -67,11 +67,16 @@ jobs:
           if not declared:
               raise SystemExit("manifest declares no native helper sources")
           for name in declared:
-              path = root / name
-              if not path.is_file():
+              if not (root / name).is_file():
                   raise SystemExit(f"missing declared native source: {name}")
-              print(f"Rust syntax: {name}")
-              import subprocess
+          # Validate every Rust source, including src/lib.rs which is the Cargo
+          # crate root but is not a manifest-injected module/helper.
+          rust_sources = sorted(root.rglob("*.rs"))
+          if not rust_sources:
+              raise SystemExit("no Rust source files found")
+          import subprocess
+          for path in rust_sources:
+              print(f"Rust syntax: {path}")
               subprocess.run(
                   ["rustfmt", "--edition", "2024", "--emit", "stdout", str(path)],
                   check=True, stdout=subprocess.DEVNULL,
