@@ -21,7 +21,7 @@ point B, and a third starts a new pair. Other held items retain normal use.
 This uses the game's own block ray pick and refuses remote multiplayer clients.
 A separate read-only world-render hook draws a selection wireframe plus up to
 64 evenly distributed sample crosses. The screen reports the geometric
-target-position count and flags selections above the 16,384-position core
+target-position count and flags selections above the 8,192-position native planner
 limit. These previews do not read block states or modify the world. The
 selection and render hooks are awaiting native build validation.
 
@@ -50,9 +50,12 @@ live game world.
 
 ## Starling 0.9.0 integration
 
-The native bundle manifest and legacy `.hnmod` source layout follow the
-v0.9.0 importer contract. The native hook scaffold is adapted against the
-pinned source and is being validated by GitHub Actions.
+The active migration branch uses Starling's Native SDK 0.2 manifest and
+versioned `.hmod` source package. The older `.hnmod` bundle is retained only
+as a reference; it is not the SDK 0.2 install artifact. GitHub Actions checks
+the pinned SDK, declared source files, Rust syntax, manifest, and `.hmod`
+packaging. This does not type-check every injected helper inside the game
+crate or prove launcher-side import.
 
 Starling 0.9.0 exposes an authoritative server-side bulk block-edit path and
 bounded column snapshot reads. The required safety contract is documented in
@@ -68,6 +71,7 @@ implementation.
 - Placement commit, conflict-aware live undo/redo and persistent history.
 - Inventory consumption and authoritative Unlimited Blocks behavior.
 - Runtime testing in Starling 0.9.0 on Android/POCO F5.
+- Type-checking all injected native helper code against the pinned game crate.
 - Launcher build-service import validation and a tested release package.
 
 See [docs/PORTING-STATUS.md](docs/PORTING-STATUS.md),
