@@ -70,7 +70,9 @@ impl Game<'_> {
         {
             return None;
         }
-        if self.lan_acting.is_none() && !self.native_window() {
+        // SelectionPoints is process-global; do not let delegated LAN actors
+        // write into the local player's selection or share another actor's points.
+        if self.lan_acting.is_some() || !self.native_window() {
             return None;
         }
         match self.guest_use {
@@ -130,7 +132,8 @@ impl Game<'_> {
             || self.spectator()
             || !matches!(self.mode, GameMode::Survival | GameMode::Creative)
             || !self.native_on(eb::ID)
-            || (self.lan_acting.is_none() && !self.native_window())
+            || self.lan_acting.is_some()
+            || !self.native_window()
         {
             return Err(NativePreflightError::NotAuthoritativePlayer);
         }
@@ -188,7 +191,8 @@ impl Game<'_> {
             || self.spectator()
             || !matches!(self.mode, GameMode::Survival | GameMode::Creative)
             || !self.native_on(eb::ID)
-            || (self.lan_acting.is_none() && !self.native_window())
+            || self.lan_acting.is_some()
+            || !self.native_window()
             || eb::selection_points() != plan.selection
             || eb::selected_tool(|key| self.native_setting(eb::ID, key)) != plan.tool
             || plan.blocks.is_empty()
