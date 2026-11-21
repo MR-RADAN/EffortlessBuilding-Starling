@@ -47,3 +47,8 @@ The SDK 0.2 project skeleton has now been added. The first CI attempt exposed th
 - `src/lib.rs` and the generated `.gitignore` are present.
 
 The legacy `horizon-mixin.toml` and root-level Rust files remain as reference; they have not been deleted. The new manifest and helper paths were fetched back from the branch for a first textual consistency check. No launcher-side `native-build`, package validation, Rust compilation, or in-game test has run yet. The next gate is to run the official launcher's manifest/layout check and then address any compiler diagnostics. No world-write code has been enabled.
+
+
+## World-session state retirement
+
+The pinned Starling 0.9.0 source confirms that `Game::finish_close_world(&mut self) -> Result<()>` is the final client-world teardown path. The SDK migration adds a HEAD mixin at that exact method. It calls `reset_world_session()` before the engine releases the active world, clearing the process-global A/B selection, any preflight status, any queued builder UI action, and the coordinate-only preview cache. This hook is deliberately not tied to `native_window()` or the builder screen lifecycle: closing/reopening the panel in the same world keeps the selection, while closing the world retires it. The reset is conservative and also runs on the remote-client leave path before the engine's early return. The source helper and manifest are covered by the native SDK workflow's declared-file and Rust-syntax checks; full injected-helper type-checking and device verification remain separate gates.
