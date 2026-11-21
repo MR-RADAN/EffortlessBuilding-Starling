@@ -154,10 +154,11 @@ pub fn preview_sample(p:&[BlockPos],cap:usize)->Vec<BlockPos>{
 }
 
 
-/// Horizon API 126-compatible vertical run, without importing Horizon crates.
-/// The field names and integer widths mirror NativeBlockRun at the pinned
-/// Starling 0.8.0 Horizon revision. Surface-relative runs are intentionally
-/// not emitted: all y coordinates are absolute and preflighted by the caller.
+/// Internal vertical-run planning record, without importing Horizon crates.
+/// This is deliberately a project-owned intermediate representation, not a
+/// claim that its fields match Starling 0.9.0's mod_api::BlockEdit run type.
+/// The 0.9.0 adapter must translate and validate every run against the pinned
+/// mod_api definitions before invoking the authoritative server edit path.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct NativeRunPlan {
     pub x: i32,
