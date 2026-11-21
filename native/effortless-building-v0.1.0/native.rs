@@ -4,6 +4,8 @@
 // world-edit adapter is a separate implementation gate.
 use super::{Game, GuestUse};
 use horizon_client::first_person::Hand;
+use horizon_client::text::Text;
+use horizon_protocol::packets::play::{self, Clientbound as C};
 
 std::thread_local! {
     // Reuse the preview batch between frames; the geometry renderer also owns
@@ -41,8 +43,12 @@ impl Game<'_> {
 
         let hit = self.pick()?;
         let pos = hit.pos;
-        let recorded = self.with_player_actor(|_game| {
+        let recorded = self.with_player_actor(|game| {
             eb::record_selection_point(pos);
+            // Give immediate feedback so touch/right-click input can be
+            // distinguished from a silent no-op on mobile.
+            let label = eb::selection_label();
+            game.eb_tell(&format!("Effortless Building: {label}"));
             true
         });
         if !recorded {
@@ -157,5 +163,22 @@ impl Game<'_> {
             // fixed per-view line capacity. A refusal draws nothing from this batch.
             let _ = draw.lines(&lines);
         });
+    }
+}
+
+
+impl Game<'_> {
+    /// Show selection feedback in the acting player's action bar. A LAN guest
+    /// receives the same overlay through the normal server chat packet path.
+    fn eb_tell(&mut self, text: &str) {
+        let line = Text::literal(text.to_owned());
+        if self.lan_acting.is_some() {
+            self.guest_packets.push(C::SystemChat(play::SystemChat {
+                content: horizon_client::lan::data::component_nbt(&line.component()),
+                overlay: true,
+            }));
+        } else {
+            self.titles.set_overlay(line, false);
+        }
     }
 }
