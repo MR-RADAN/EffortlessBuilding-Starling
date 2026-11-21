@@ -398,6 +398,107 @@ pub fn plan_snapshot_transaction(
 }
 
 
+/// The initial two-corner construction tools exposed by the native screen.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SelectionTool {
+    Floor,
+    Wall,
+    Pillar,
+    Cube,
+}
+
+/// Turn two captured block positions into a bounded geometry list.
+/// Floor uses the lower selected Y as its plane; Wall uses the X/Z rectangle
+/// and the inclusive vertical span; Pillar uses point A's X/Z and the same
+/// inclusive vertical span; Cube uses both complete corners.
+pub fn geometry_for_selection(
+    tool: SelectionTool,
+    a: BlockPos,
+    b: BlockPos,
+    limits: Limits,
+) -> Result<Vec<BlockPos>, GeometryError> {
+    let base_y = a.y.min(b.y);
+    let height = u32::try_from(i64::from(a.y.max(b.y)) - i64::from(base_y) + 1)
+        .map_err(|_| GeometryError::CoordinateOverflow)?;
+    let base = BlockPos::new(a.x, base_y, a.z);
+    let other = BlockPos::new(b.x, base_y, b.z);
+    match tool {
+        SelectionTool::Floor => floor(base, other, limits),
+        SelectionTool::Wall => wall(base, other, height, limits),
+        SelectionTool::Pillar => column(base, height, limits),
+        SelectionTool::Cube => cube(a, b, limits),
+    }
+}
+
+#[cfg(test)]
+mod selection_geometry_tests {
+    use super::*;
+
+    #[test]
+    fn floor_selection_uses_two_corners_and_lower_y_plane() {
+        let points = geometry_for_selection(
+            SelectionTool::Floor,
+            BlockPos::new(1, 8, 2),
+            BlockPos::new(3, 5, 4),
+            Limits { max_blocks: 32 },
+        ).unwrap();
+        assert_eq!(points.len(), 9);
+        assert!(points.iter().all(|p| p.y == 5));
+    }
+
+    #[test]
+    fn wall_selection_uses_rectangle_and_inclusive_vertical_span() {
+        let points = geometry_for_selection(
+            SelectionTool::Wall,
+            BlockPos::new(1, 4, 2),
+            BlockPos::new(2, 6, 2),
+            Limits { max_blocks: 32 },
+        ).unwrap();
+        assert_eq!(points.len(), 6);
+        assert_eq!(points.iter().map(|p| p.y).min(), Some(4));
+        assert_eq!(points.iter().map(|p| p.y).max(), Some(6));
+    }
+
+    #[test]
+    fn pillar_selection_uses_first_corner_footprint_and_vertical_span() {
+        let points = geometry_for_selection(
+            SelectionTool::Pillar,
+            BlockPos::new(-2, 3, 7),
+            BlockPos::new(9, 5, 1),
+            Limits { max_blocks: 32 },
+        ).unwrap();
+        assert_eq!(points, vec![
+            BlockPos::new(-2, 3, 7),
+            BlockPos::new(-2, 4, 7),
+            BlockPos::new(-2, 5, 7),
+        ]);
+    }
+
+    #[test]
+    fn cube_selection_uses_both_complete_corners() {
+        let points = geometry_for_selection(
+            SelectionTool::Cube,
+            BlockPos::new(0, 0, 0),
+            BlockPos::new(1, 1, 1),
+            Limits { max_blocks: 8 },
+        ).unwrap();
+        assert_eq!(points.len(), 8);
+    }
+
+    #[test]
+    fn selection_geometry_fails_closed_at_the_operation_cap() {
+        assert_eq!(
+            geometry_for_selection(
+                SelectionTool::Cube,
+                BlockPos::new(0, 0, 0),
+                BlockPos::new(20, 20, 20),
+                Limits { max_blocks: 32 },
+            ),
+            Err(GeometryError::TooManyBlocks)
+        );
+    }
+}
+
 /// A vertical rectangular pillar with a one-block footprint.
 pub fn column(base: BlockPos, height: u32, l: Limits) -> Result<Vec<BlockPos>, GeometryError> {
     if height == 0 { return Err(GeometryError::InvalidHeight); }
