@@ -189,7 +189,7 @@ pub struct UiLayout {
 pub fn selected_tool(read: impl Fn(&str) -> Option<String>) -> usize {
     read("tool")
         .and_then(|s| s.trim().parse::<usize>().ok())
-        .filter(|i| *i < TOOLS.len())
+        .filter(|i| *i < TOOLS.len() && *i != 1)
         .unwrap_or(0)
 }
 
@@ -200,7 +200,9 @@ pub fn setting_labels(tool: usize) -> Vec<String> {
         .iter()
         .enumerate()
         .map(|(index, name)| {
-            if index == selected {
+            if index == 1 {
+                "[—] Wall (unavailable)".to_owned()
+            } else if index == selected {
                 format!("[x] {name}")
             } else {
                 format!("[ ] {name}")
@@ -262,7 +264,7 @@ pub fn contains(rect: [f32; 4], point: [f32; 2]) -> bool {
 /// Map a screen tap to a tool index or the close action.
 pub fn ui_action_at(layout: &UiLayout, point: [f32; 2]) -> Option<i32> {
     for (index, rect) in layout.tools.iter().enumerate() {
-        if contains(*rect, point) {
+        if index != 1 && contains(*rect, point) {
             return Some(index as i32);
         }
     }
@@ -336,19 +338,22 @@ pub fn draw_screen(
     let selected = selected_tool(|key| game.native_setting(ID, key));
     for (index, rect) in layout.tools.iter().enumerate() {
         let active = index == selected;
+        let unavailable = index == 1;
         game.native_fill(
             batch,
             *rect,
-            if active { 0xFF245B43 } else { 0xFF26394C },
+            if unavailable { 0xFF202830 } else if active { 0xFF245B43 } else { 0xFF26394C },
         );
-        let label = if active {
+        let label = if unavailable {
+            "Wall (soon)".to_owned()
+        } else if active {
             format!("[x] {}", TOOLS[index])
         } else {
             format!("[ ] {}", TOOLS[index])
         };
         let tx = rect[0] + (rect[2] - game.native_text_width(&label)) * 0.5;
         let ty = rect[1] + (rect[3] - 9.0) * 0.5;
-        game.native_text(batch, &label, [tx, ty], 0xFFFFFF, true);
+        game.native_text(batch, &label, [tx, ty], if unavailable { 0x8793A0 } else { 0xFFFFFF }, true);
     }
 
     game.native_fill(batch, layout.preflight, 0xFF245B43);
@@ -382,13 +387,14 @@ mod tests {
     fn settings_have_four_tools_and_builder_button() {
         let labels = setting_labels(2);
         assert_eq!(labels.len(), 5);
-        assert_eq!(&labels[..4], ["[ ] Floor", "[ ] Wall", "[x] Pillar", "[ ] Cube"]);
+        assert_eq!(&labels[..4], ["[ ] Floor", "[—] Wall (unavailable)", "[x] Pillar", "[ ] Cube"]);
         assert_eq!(labels[4], "Open Builder");
     }
 
     #[test]
     fn settings_clamp_invalid_selection() {
         assert_eq!(setting_labels(99)[3], "[x] Cube");
+        assert_eq!(selected_tool(|_| Some("1".to_owned())), 0);
     }
 
     #[test]
@@ -407,6 +413,7 @@ mod tests {
     fn ui_hit_testing_returns_tool_and_close_actions() {
         let layout = ui_layout([0.0, 0.0, 854.0, 480.0]);
         let center = |r: [f32; 4]| [r[0] + r[2] * 0.5, r[1] + r[3] * 0.5];
+        assert_eq!(ui_action_at(&layout, center(layout.tools[1])), None);
         assert_eq!(ui_action_at(&layout, center(layout.tools[2])), Some(2));
         assert_eq!(ui_action_at(&layout, center(layout.close)), Some(ACTION_CLOSE));
         assert_eq!(ui_action_at(&layout, [0.0, 0.0]), None);
