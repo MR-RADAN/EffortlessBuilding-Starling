@@ -3,15 +3,13 @@ fn effortless_building_screen_release(
     screen: &crate::mod_api::NativeScreenView<'_>,
     button: i32,
     _modifiers: u32,
-    canceled: &mut bool,
 ) {
-    use crate::game::effortless_building as m;
-
+    // Mouse release Post has no cancellation argument in Starling 0.9.0.
+    // Keep this hook observational; it must not claim to consume the event.
     if button == 0
         && screen.id == "mod"
-        && game.native_mod_screen() == Some(m::ID)
-        && m::release_captured_left_press()
+        && game.native_mod_screen().is_none()
     {
-        *canceled = true;
+        return;
     }
 }
