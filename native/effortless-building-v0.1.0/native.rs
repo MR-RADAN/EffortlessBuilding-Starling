@@ -35,6 +35,15 @@ impl NativePreflightBlock {
     }
 }
 
+/// Immutable result of one complete preflight pass. The selection and tool
+/// are retained with the snapshots so a future confirmation/commit phase can
+/// reject stale UI state instead of silently rebuilding a different plan.
+pub(super) struct NativePreflightPlan {
+    pub selection: crate::game::effortless_building::SelectionPoints,
+    pub tool: usize,
+    pub blocks: Vec<NativePreflightBlock>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum NativePreflightError {
     NotAuthoritativePlayer,
@@ -98,7 +107,7 @@ impl Game<'_> {
     /// any future write phase. Arbitrary caller-supplied target lists are not accepted.
     pub(super) fn effortless_building_preflight_selection(
         &self,
-    ) -> Result<Vec<NativePreflightBlock>, NativePreflightError> {
+    ) -> Result<NativePreflightPlan, NativePreflightError> {
         use crate::game::effortless_building as eb;
 
         let selection = eb::selection_points();
@@ -152,7 +161,11 @@ impl Game<'_> {
             // Preserve the typed, registry-scoped ID at the native boundary.
             snapshot.push(NativePreflightBlock { pos, before_state: state_id });
         }
-        Ok(snapshot)
+        Ok(NativePreflightPlan {
+            selection,
+            tool,
+            blocks: snapshot,
+        })
     }
 }
 
