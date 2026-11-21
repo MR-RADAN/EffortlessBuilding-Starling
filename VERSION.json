@@ -5,10 +5,10 @@
   "creator_and_port_maintainer": "MR",
   "upstream_mod_author": "Requios",
   "upstream_license": "LGPL-3.0-or-later",
-  "target": "Starling 0.8.0 / Horizon ARM64",
-  "horizon_revision": "ac874422ed8f892505ff73d67ae486ecfee7a516",
-  "horizon_mixins_revision": "ddd9700b21997c95d95ac6ee5ecafe3830cf622a",
-  "status": "source prototype; not yet a validated or installable hnmod",
+  "target": "Starling 0.9.0 / Horizon ARM64",
+  "horizon_revision": "ff303502a4f7982551a0e0d3622d9268efe9e829",
+  "horizon_mixins_revision": "5a64af938ec86b00d53d16a408aabc0038fb3e57",
+  "status": "source prototype; v0.9.0 pins updated; native build and in-game validation pending",
   "implemented_core": ["line", "wall", "floor", "cuboid", "circle", "cylinder", "sphere", "pyramid", "cone", "dome", "bounded undo planning", "chunk-aware batches", "bounded preview sampling"],
-  "integration_status": "game hooks, native screen, inventory handling, server-authoritative edits and packaging remain unimplemented"
+  "integration_status": "legacy native hook bundle scaffold exists; v0.9.0 build service, touch delivery, authoritative world edits, inventory handling and undo/redo remain unverified"
 }
