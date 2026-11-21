@@ -145,3 +145,23 @@ count as Cube). Do not expose Wall placement until its intended plane/orientatio
 semantics are defined and the planner, count, and preview all agree.
 
 No world writes, chunk loads, or placement hooks were added in this milestone.
+
+
+## Next implementation gate — source provenance and Wall semantics
+
+The connected GitHub installation does not currently expose the pinned
+Horizon upstream repository, and searches for the exact world/chunk APIs and
+Wrench hook return no indexed source matches. The prior Wrench API notes remain
+useful design evidence, but this pass cannot independently verify their exact
+signatures against the pinned revision.
+
+Do not add guessed calls for world border, loaded chunks, block registry, or
+block-state construction. The next safe action is to make the upstream Horizon
+repository accessible to source inspection, then verify those APIs at the
+pinned revision before implementing a read-only validator.
+
+Wall remains a UI-visible tool label but its current planner/count/preview
+semantics are not a true wall plane. It must be treated as unavailable for
+placement until the intended orientation is defined and all three layers use
+the same plane geometry. The existing planner is not yet wired into UI preview,
+and no placement path should consume it yet.
