@@ -1,12 +1,9 @@
 name: Compile native mod against Starling 0.9.0
 
 on:
-  workflow_dispatch:
-  push:
-    branches: [main, migration/native-sdk-0.2]
-    paths:
-      - "native/effortless-building-v0.1.0/**"
-      - ".github/workflows/native-android-build.yml"
+  # Manual only until the SDK 0.2 HMOD has a native-mixins adapter.
+  # Starling's native_build.sh currently accepts horizon-mixin.toml bundles,
+  # whereas this project exports horizon-mod.toml HMOD packages.
 
 concurrency:
   group: native-android-build-${{ github.ref }}
@@ -24,6 +21,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      - name: Verify bundle format is supported by native_build.sh
+        run: |
+          if [ ! -f native/effortless-building-v0.1.0/horizon-mixin.toml ]; then
+            echo "This workflow cannot compile an SDK 0.2 HMOD yet: Starling native_build.sh requires a horizon-mixin.toml bundle, but this project provides horizon-mod.toml. Add a verified HMOD-to-native-mixins adapter before enabling ARM64 compilation."
+            exit 1
+          fi
 
       - name: Check out the exact Starling 0.9.0 source
         uses: actions/checkout@v4
