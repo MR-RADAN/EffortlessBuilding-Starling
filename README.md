@@ -13,8 +13,11 @@ This repository contains a Starling 0.9.0 native bundle scaffold, a mobile
 builder tool-selection screen, a pure Rust geometry/transaction core, and
 version-pinned package metadata. The native screen can open, render, select
 Floor/Wall/Pillar/Cube and close while capturing clicks inside its panel.
-It does not yet select world positions, preview blocks in-world, or modify
-the game world.
+The screen now explains the two-point workflow. With the mod enabled, a
+main-hand right-click on a block records point A, a second records point B,
+and a third starts a new pair. This uses the game's own block ray pick and
+refuses remote multiplayer clients. The new hook is awaiting native build
+validation; it does not preview or modify blocks.
 
 ## Implemented in the pure Rust core
 
@@ -51,7 +54,7 @@ implementation.
 
 ## Not yet implemented or verified
 
-- Live world-coordinate selection and in-world preview markers.
+- In-world preview markers and live world snapshot/block-edit adapter.
 - Live world snapshot and block-edit adapter.
 - Placement commit, conflict-aware live undo/redo and persistent history.
 - Inventory consumption and authoritative Unlimited Blocks behavior.
