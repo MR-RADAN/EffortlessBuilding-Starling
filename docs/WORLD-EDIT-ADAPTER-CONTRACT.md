@@ -83,27 +83,48 @@ is still required.
 - Wrench mixin manifest: `native-mods/wrench/mixins/wrench/horizon-mixin.toml`
 - Project implementation notes: `native/effortless-building-v0.1.0/SERVER-HOOK-IMPLEMENTATION.md`
 
-## Starling 0.9.0 write-boundary finding
+## Starling 0.9.0 native write route — verified
 
-The pinned Starling source confirms that `Game::with_level`, `Game::level_set`,
-and `Game::level_set_with_flags` are private implementation methods, not a
-native-mod API. The registry's `BlockRegistry::default_state`, `state`, and
-`id` methods are public, but they only resolve/read registry metadata; they
-do not grant world-write access. Do not work around this boundary by reaching
-into private fields, calling vanilla behaviour through an unsafe alias, or
-writing chunk storage directly.
+The previous conclusion that the private `Game::with_level` method was
+inaccessible from this native bundle was incorrect. Native SDK 0.2 injects
+this module as a child module of `crate::game`; Rust child modules can access
+private items of their parent module. Starling's own Wrench native mod proves
+the exact supported pattern: its injected `crate::game::wrench_native`
+implementation calls `self.with_level(...)`, invokes
+`Behaviours::can_survive`, `update_from_neighbour_shapes`, and
+`set_block`, then calls `self.process_level_events()`.
 
-Consequently, the current native bundle must remain read-only until Starling
-exposes a supported native-mod world-edit adapter (or an explicitly supported
-hook with a safe mutable level capability). That adapter must define:
-- authoritative logical-server execution and loaded-chunk/height/border checks;
-- placement survival and update/event semantics equivalent to normal block
-  placement, including neighbour updates and block entities;
-- bounded batch execution with cancellation points and a rollback strategy;
-- a result for every target so partial failure can be reversed safely.
+The pinned Starling source confirms that `with_level`,
+`level_set`, and `level_set_with_flags` are private, but private visibility
+does not prevent this injected child module from calling them. This is not a
+general public Native Mod API: it is an in-crate capability provided by the
+SDK's source-injection model. Follow the Wrench pattern rather than inventing
+a separate `ServerHost` interface or using unsafe/private-field workarounds.
 
-The preflight snapshot is not itself a transaction or a reservation: the
-world can change between preview, confirmation, and commit. A future commit
-must revalidate the complete selection and before-state immediately before
-writing, and must not overwrite a changed target silently. Undo data must be
-captured before the first mutation and retained only for the bounded operation.
+The safe placement path for this project is therefore available in principle:
+
+1. Revalidate the frozen selection and every before-state immediately before
+   mutation, on the authoritative local logical-server Game instance.
+2. Resolve the intended complete `BlockStateId` through the active registry;
+   reject unresolved or registry-incompatible states.
+3. Use `self.with_level(|behaviours, level, ticks| ...)` for survival checks
+   and `Behaviours::set_block(..., level_flags::UPDATE_ALL)`; never mutate
+   chunk storage directly.
+4. Process level events through `self.process_level_events()` after writes.
+5. Keep work bounded, yield/cancel between batches, record only actual
+   successful writes, and use guarded best-effort restoration if a later
+   write fails. Do not claim atomicity or guaranteed rollback.
+
+This finding removes the previous API-access blocker, but it does not mean
+bulk placement is already implemented or validated. The current native
+bundle remains read-only until the transaction/confirmation path is
+implemented and tested. In particular, placement semantics, block entities,
+inventory accounting, partial failure handling, and runtime behaviour still
+need explicit verification.
+
+Reference implementation at the pinned Starling revision:
+- `native-mods/wrench/mixins/wrench/native.rs` — in-crate `with_level`
+  access, survival/shape validation, `set_block`, and event processing.
+- `native-mods/wrench/mixins/wrench/use.rs` — cancellable item-use hook.
+- `crates/horizon-client/src/game.rs` — definitions of `with_level`,
+  `level_set_with_flags`, and `process_level_events`.
