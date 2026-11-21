@@ -27,6 +27,8 @@ validation; it does not preview or modify blocks.
 - Chunk-aware run grouping, including negative world coordinates.
 - Column snapshot decoding with strict palette, range and unloaded-column
   rejection.
+- Two-corner geometry mapping for Floor, Wall, Pillar and Cube, with bounded
+  output and inclusive vertical spans.
 - Snapshot-gated placement planning; missing or duplicate snapshot entries
   fail closed.
 - Guarded undo/redo planning that rejects stale world state rather than
