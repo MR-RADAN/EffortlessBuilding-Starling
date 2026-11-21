@@ -41,8 +41,14 @@ Historical 0.8.0 build and pin information is retained in
   player's ray pick. Other held items retain normal use behavior. First click
   sets A, second sets B, and a third starts a new pair. The hook deliberately
   refuses remote multiplayer clients.
-- This point-capture implementation is source-only until the next native
-  Android build validates the new `use_item` hook and module.
+- A `submit_custom_geometry` hook now draws a read-only world-space wireframe
+  and up to 64 evenly distributed sample crosses over the selected volume.
+  The per-thread line buffer is reused between frames; the renderer's own
+  fixed-capacity batch validates the whole submission atomically.
+- The preview represents the selected region, not individual ghost block
+  states. It does not read block snapshots or modify the world.
+- Point capture and preview remain source-only until the next native Android
+  build validates the new `use_item` and `submit_custom_geometry` hooks.
 
 ## Starling 0.9.0 source audit
 
@@ -86,8 +92,9 @@ Verified directly against the pinned source:
 ## Not yet implemented or verified
 
 - No live world read/write adapter is connected to the UI.
-- Two-point block selection is implemented in source but awaits native build
-  validation; no spatial preview markers are implemented.
+- Two-point block selection and a bounded read-only spatial outline/sample
+  preview are implemented in source but await native build validation. No
+  per-block ghost preview or world-edit adapter exists yet.
 - No block placement, wall/floor/cuboid commit, or shape commit is available.
 - No live undo/redo is connected to snapshots.
 - No inventory consumption or Unlimited Blocks implementation is available.
