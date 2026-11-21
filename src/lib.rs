@@ -56,22 +56,38 @@ pub fn line(a:BlockPos,b:BlockPos,l:Limits)->Result<Vec<BlockPos>,GeometryError>
 /// Filled axis-aligned cuboid, inclusive at both corners.
 pub fn cube(a:BlockPos,b:BlockPos,l:Limits)->Result<Vec<BlockPos>,GeometryError>{
     let (x0,x1)=(a.x.min(b.x),a.x.max(b.x)); let (y0,y1)=(a.y.min(b.y),a.y.max(b.y)); let (z0,z1)=(a.z.min(b.z),a.z.max(b.z));
-    let n=(i64::from(x1)-i64::from(x0)+1)*(i64::from(y1)-i64::from(y0)+1)*(i64::from(z1)-i64::from(z0)+1);
+    let dx=i64::from(x1)-i64::from(x0)+1;
+    let dy=i64::from(y1)-i64::from(y0)+1;
+    let dz=i64::from(z1)-i64::from(z0)+1;
+    let n=dx.checked_mul(dy).and_then(|v|v.checked_mul(dz)).ok_or(GeometryError::TooManyBlocks)?;
     if n>l.max_blocks as i64{return Err(GeometryError::TooManyBlocks)}
     let mut v=Vec::with_capacity(n as usize); for x in x0..=x1{for y in y0..=y1{for z in z0..=z1{v.push(BlockPos::new(x,y,z))}}} finish(v,l)
 }
 /// Filled horizontal rectangle.
 pub fn floor(a:BlockPos,b:BlockPos,l:Limits)->Result<Vec<BlockPos>,GeometryError>{
-    let n=(i64::from(a.x.max(b.x))-i64::from(a.x.min(b.x))+1)*(i64::from(a.z.max(b.z))-i64::from(a.z.min(b.z))+1);
+    let dx=i64::from(a.x.max(b.x))-i64::from(a.x.min(b.x))+1;
+    let dz=i64::from(a.z.max(b.z))-i64::from(a.z.min(b.z))+1;
+    let n=dx.checked_mul(dz).ok_or(GeometryError::TooManyBlocks)?;
     if n>l.max_blocks as i64{return Err(GeometryError::TooManyBlocks)}
     let mut v=Vec::with_capacity(n as usize);for x in a.x.min(b.x)..=a.x.max(b.x){for z in a.z.min(b.z)..=a.z.max(b.z){v.push(BlockPos::new(x,a.y,z))}}finish(v,l)
 }
 /// Filled rectangular wall rising from a.y.
 pub fn wall(a:BlockPos,b:BlockPos,h:u32,l:Limits)->Result<Vec<BlockPos>,GeometryError>{
     if h==0{return Err(GeometryError::InvalidHeight)}
-    let n=(i64::from(a.x.max(b.x))-i64::from(a.x.min(b.x))+1)*(i64::from(a.z.max(b.z))-i64::from(a.z.min(b.z))+1)*i64::from(h);
+    let dx=i64::from(a.x.max(b.x))-i64::from(a.x.min(b.x))+1;
+    let dz=i64::from(a.z.max(b.z))-i64::from(a.z.min(b.z))+1;
+    let n=dx.checked_mul(dz).and_then(|v|v.checked_mul(i64::from(h))).ok_or(GeometryError::TooManyBlocks)?;
     if n>l.max_blocks as i64{return Err(GeometryError::TooManyBlocks)}
-    let mut v=Vec::with_capacity(n as usize);for y in 0..h{let yy=a.y.checked_add(y as i32).ok_or(GeometryError::CoordinateOverflow)?;for x in a.x.min(b.x)..=a.x.max(b.x){for z in a.z.min(b.z)..=a.z.max(b.z){v.push(BlockPos::new(x,yy,z))}}}finish(v,l)
+    let top=i64::from(a.y)+i64::from(h)-1;
+    if top>i64::from(i32::MAX){return Err(GeometryError::CoordinateOverflow)}
+    let mut v=Vec::with_capacity(n as usize);
+    for y in 0..h {
+        let yy=i32::try_from(i64::from(a.y)+i64::from(y)).map_err(|_|GeometryError::CoordinateOverflow)?;
+        for x in a.x.min(b.x)..=a.x.max(b.x) {
+            for z in a.z.min(b.z)..=a.z.max(b.z) { v.push(BlockPos::new(x,yy,z)); }
+        }
+    }
+    finish(v,l)
 }
 /// Filled horizontal disk.
 pub fn circle(c:BlockPos,r:u32,l:Limits)->Result<Vec<BlockPos>,GeometryError>{
@@ -744,5 +760,40 @@ mod build_session_tests {
         replacement.block_palette_index = 8;
         session.preview(replacement);
         assert_eq!(session.confirm().unwrap().block_palette_index, 8);
+    }
+}
+
+
+#[cfg(test)]
+mod overflow_regression_tests {
+    use super::*;
+
+    #[test]
+    fn huge_cuboid_dimensions_fail_closed_without_integer_overflow() {
+        let a = BlockPos::new(i32::MIN, i32::MIN, i32::MIN);
+        let b = BlockPos::new(i32::MAX, i32::MAX, i32::MAX);
+        assert_eq!(cube(a, b, Limits { max_blocks: 16_384 }), Err(GeometryError::TooManyBlocks));
+    }
+
+    #[test]
+    fn huge_floor_dimensions_fail_closed_without_integer_overflow() {
+        let a = BlockPos::new(i32::MIN, 0, i32::MIN);
+        let b = BlockPos::new(i32::MAX, 0, i32::MAX);
+        assert_eq!(floor(a, b, Limits { max_blocks: 16_384 }), Err(GeometryError::TooManyBlocks));
+    }
+
+    #[test]
+    fn wall_height_cannot_wrap_the_y_coordinate() {
+        assert_eq!(
+            wall(BlockPos::new(0, i32::MAX, 0), BlockPos::new(0, i32::MAX, 0), 2, Limits::default()),
+            Err(GeometryError::CoordinateOverflow)
+        );
+    }
+
+    #[test]
+    fn huge_wall_dimensions_fail_closed_without_integer_overflow() {
+        let a = BlockPos::new(i32::MIN, 0, i32::MIN);
+        let b = BlockPos::new(i32::MAX, 0, i32::MAX);
+        assert_eq!(wall(a, b, u32::MAX, Limits::default()), Err(GeometryError::TooManyBlocks));
     }
 }
