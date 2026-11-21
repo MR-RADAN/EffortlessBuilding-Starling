@@ -73,7 +73,8 @@ impl Game<'_> {
     pub(super) fn effortless_building_use(&mut self) -> Option<Option<Hand>> {
         use crate::game::effortless_building as eb;
 
-        if self.remote.is_some()
+        if !self.native_authoritative()
+            || self.remote.is_some()
             || self.player.is_none()
             || self.spectator()
             || !matches!(self.mode, GameMode::Survival | GameMode::Creative)
@@ -138,7 +139,8 @@ impl Game<'_> {
         if targets.iter().any(|pos| !seen.insert(*pos)) {
             return Err(NativePreflightError::InvalidPlan);
         }
-        if self.remote.is_some()
+        if !self.native_authoritative()
+            || self.remote.is_some()
             || self.player.is_none()
             || self.spectator()
             || !matches!(self.mode, GameMode::Survival | GameMode::Creative)
@@ -229,7 +231,8 @@ impl Game<'_> {
     ) -> bool {
         use crate::game::effortless_building as eb;
 
-        if self.remote.is_some()
+        if !self.native_authoritative()
+            || self.remote.is_some()
             || self.player.is_none()
             || self.spectator()
             || !matches!(self.mode, GameMode::Survival | GameMode::Creative)
