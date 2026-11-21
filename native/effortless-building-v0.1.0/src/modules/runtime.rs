@@ -49,6 +49,7 @@ static SELECTION_POINTS: Mutex<SelectionPoints> = Mutex::new(SelectionPoints {
 /// Record a point from the authoritative in-game block ray pick.
 pub fn record_selection_point(pos: [i32; 3]) {
     SELECTION_POINTS.lock().unwrap_or_else(|e| e.into_inner()).record(pos);
+    clear_preflight_status();
 }
 
 pub fn selection_points() -> SelectionPoints {
@@ -188,6 +189,12 @@ pub fn preflight_status() -> String {
     PREFLIGHT_STATUS.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
+/// A successful preflight is only valid for the exact selection and tool
+/// that were checked. Remove its green status as soon as either changes.
+pub fn clear_preflight_status() {
+    PREFLIGHT_STATUS.lock().unwrap_or_else(|e| e.into_inner()).clear();
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct UiLayout {
     pub panel: [f32; 4],
@@ -301,6 +308,7 @@ pub fn process_pending_ui_action(game: &mut crate::game::Game<'_>) {
     match PENDING_UI_ACTION.swap(NO_ACTION, Ordering::AcqRel) {
         action if (0..TOOLS.len() as i32).contains(&action) && action != 1 => {
             game.native_set_setting(ID, "tool", &action.to_string());
+            clear_preflight_status();
         }
         ACTION_PREFLIGHT => {
             let status = match game.effortless_building_preflight_selection() {
