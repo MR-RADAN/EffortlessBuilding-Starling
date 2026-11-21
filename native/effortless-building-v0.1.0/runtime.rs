@@ -468,6 +468,8 @@ mod selection_count_tests {
             Err(PlanError::IncompleteSelection)
         );
         let selection = SelectionPoints { first: Some([0, 0, 0]), second: Some([0, 0, 0]) };
+        assert_eq!(selection_block_count_for(selection, 1), None);
+        assert_eq!(plan_target_positions(selection, 1), Err(PlanError::InvalidTool));
         assert_eq!(plan_target_positions(selection, 9), Err(PlanError::InvalidTool));
     }
 
