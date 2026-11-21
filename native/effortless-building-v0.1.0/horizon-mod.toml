@@ -1,0 +1,123 @@
+id = "effortless_building"
+name = "Effortless Building"
+version = "0.1.0"
+description = "Mobile-first building tools with bounded, read-only preview and preflight validation."
+authors = ["MR"]
+api = "0.2"
+side = "both"
+capabilities = []
+
+[native]
+game = "26.3"
+horizon = "ff303502a4f7982551a0e0d3622d9268efe9e829"
+mixins = "5a64af938ec86b00d53d16a408aabc0038fb3e57"
+
+[[native.module]]
+id = "native"
+file = "crates/horizon-client/src/game.rs"
+name = "effortless_building_native"
+source = "src/modules/native.rs"
+
+[[native.module]]
+id = "preview"
+file = "crates/horizon-client/src/game.rs"
+name = "effortless_building_preview"
+source = "src/modules/preview.rs"
+
+[[native.module]]
+id = "runtime"
+file = "crates/horizon-client/src/game.rs"
+name = "effortless_building"
+source = "src/modules/runtime.rs"
+
+[[native.mixin]]
+id = "use"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::Game<'_>::use_item"
+helper = "src/mixins/use.rs"
+bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
+
+[[native.mixin]]
+id = "world_preview"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_submit_custom_geometry"
+helper = "src/mixins/world_preview.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "view", ty = "&crate::mod_api::WorldRenderView", value = "view" },
+  { name = "draw", ty = "&mut horizon_client::world_geometry::WorldGeometry", value = "draw" },
+]
+
+[[native.mixin]]
+id = "list"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_mods"
+helper = "src/mixins/list.rs"
+bindings = [{ name = "mods", ty = "&mut Vec<crate::game::native_hooks::NativeMod>", value = "&mut *mods" }]
+
+[[native.mixin]]
+id = "settings"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_settings"
+helper = "src/mixins/settings.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "mod_id", ty = "&str", value = "mod_id" },
+  { name = "buttons", ty = "&mut Vec<String>", value = "&mut *buttons" },
+]
+
+[[native.mixin]]
+id = "click"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_settings_click"
+helper = "src/mixins/click.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "mod_id", ty = "&str", value = "mod_id" },
+  { name = "button", ty = "usize", value = "button" },
+]
+
+[[native.mixin]]
+id = "screen_render"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_screen_render_post"
+helper = "src/mixins/screen_render.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "batch", ty = "&mut crate::mod_api::HudBatch", value = "batch" },
+  { name = "screen", ty = "&crate::mod_api::NativeScreenView<'_>", value = "screen" },
+]
+
+[[native.mixin]]
+id = "screen_click"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_screen_mouse_button_pressed_pre"
+helper = "src/mixins/screen_click.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "screen", ty = "&crate::mod_api::NativeScreenView<'_>", value = "screen" },
+  { name = "button", ty = "i32", value = "button" },
+  { name = "_modifiers", ty = "u32", value = "modifiers" },
+  { name = "canceled", ty = "&mut bool", value = "&mut *canceled" },
+]
+
+[[native.mixin]]
+id = "screen_release"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_screen_mouse_button_released_pre"
+helper = "src/mixins/screen_release.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "screen", ty = "&crate::mod_api::NativeScreenView<'_>", value = "screen" },
+  { name = "button", ty = "i32", value = "button" },
+  { name = "_modifiers", ty = "u32", value = "modifiers" },
+  { name = "canceled", ty = "&mut bool", value = "&mut *canceled" },
+]
+
+[[native.mixin]]
+id = "tick"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_tick"
+helper = "src/mixins/tick.rs"
+bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
