@@ -345,6 +345,7 @@ mod tests {
         assert_eq!(ui_action_at(&layout, center(layout.clear)), Some(ACTION_CLEAR));
         assert_eq!(ui_action_at(&layout, center(layout.close)), Some(ACTION_CLOSE));
         assert_eq!(ui_action_at(&layout, [0.0, 0.0]), None);
+        assert!(layout.clear[0] + layout.clear[2] <= layout.close[0]);
     }
 }
 
@@ -392,5 +393,21 @@ mod selection_count_tests {
             selection_block_count_for(selection, 3),
             Some(1u128 << 96)
         );
+    }
+}
+
+ 
+#[cfg(test)]
+mod selection_reset_tests {
+    use super::*;
+
+    #[test]
+    fn clear_selection_removes_both_corners() {
+        record_selection_point([3, 4, 5]);
+        record_selection_point([8, 9, 10]);
+        assert!(selection_points().first.is_some());
+        assert!(selection_points().second.is_some());
+        clear_selection_points();
+        assert_eq!(selection_points(), SelectionPoints::default());
     }
 }
