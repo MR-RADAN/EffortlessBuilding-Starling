@@ -125,3 +125,57 @@ The existing mixin integration currently captures selection and draws a
 read-only preview; it is not yet a `ServerHost` callback implementation. The
 next implementation milestone is to add a proper server native-mod hook and
 route snapshot, commit, undo and redo through its `ServerHost` methods.
+
+
+## Confirmed server-hook route (Starling 0.9.0)
+
+The supported mod entry point is the root `impl mod_api::Hooks` marked with
+`#[mod_api::horizon_mod]`. Server-side listeners receive
+`&mut dyn ServerHost` plus the hook event. The `server_tick` hook is a
+server-side listen hook; its contract explicitly permits block reads through
+`native_server_block` and is the appropriate authoritative tick boundary for
+bounded adapter work. A listener must not attempt to use a client-side
+`Game` mixin as a substitute for this host.
+
+The public server host exposes these world-edit methods (declared in
+`crates/horizon-mod-vocab/src/host/world_edit.rs`):
+
+- `surface_heights(dimension, columns, heightmap)`: returns `None` for an
+  unloaded column; at most 65,536 columns per call.
+- `read_columns(dimension, columns, heightmap, range)`: at most 1,048,576
+  block positions per call. Unloaded columns are represented as air, so this
+  read is only a valid snapshot after every target column has passed the
+  `surface_heights` preflight.
+- `edit_blocks(dimension, edit)`: validates the complete palette, filters,
+  and run references before mutation. Its engine contract also says runs in
+  unloaded chunks and run portions outside the column are left out. Therefore
+  the adapter must preflight every target column and vertical bound before
+  issuing the edit; a successful return alone is not proof that every intended
+  position changed.
+
+### Conflict-safe commit design
+
+1. Build a deterministic list of unique target columns and reject a target
+   count above the core's 16,384-position cap before allocating large buffers.
+2. Query `surface_heights` in bounded batches; if any target column returns
+   `None`, abort before reading or writing.
+3. Read the exact target Y span in batches no larger than 1,048,576 positions.
+   Preserve full `BlockState` values, not only block identifiers.
+4. Build the edit runs and expected-state filters from that snapshot. A run
+   must only match the exact pre-commit state captured for its position; group
+   identical predicates to stay below the 65,536-filter limit.
+5. Recheck that the operation is still the current confirmed preview, the
+   world epoch/dimension has not changed, and the request is within the safe
+   vertical bounds immediately before `edit_blocks`.
+6. Treat any refusal, count mismatch, or stale confirmation as a failed
+   operation. Do not record it as committed history. Only create an undo entry
+   after the host reports the complete expected change count.
+
+The API does not expose a general multi-call world transaction or a rollback
+primitive. In particular, the read and edit happen in separate host calls, so
+this is optimistic conflict checking, not a database-style lock. The adapter
+must be conservative about external edits between snapshot and commit, and it
+must never promise strict atomic rollback for a failure after engine mutation.
+Undo/redo must use the same snapshot/filter/preflight discipline and must
+refuse to overwrite positions whose current states no longer match the
+expected post-state.
