@@ -1,6 +1,6 @@
 # Native Android build validation
 
-## Latest result: successful compile
+## Historical result: successful Starling 0.8.0 compile
 
 The GitHub Actions run [44834111100](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44834111100) completed successfully for commit `48d00a4e2f2ab4030b4cf0ec2412073d9d685695`.
 
@@ -35,3 +35,18 @@ testing it in-game.
 The current UI milestone does not yet select world coordinates, render a
 spatial preview, read block snapshots, place blocks, or implement undo/redo.
 No block-edit API is called, so this milestone cannot alter the world.
+
+
+## Starling 0.9.0 validation — in progress
+
+The project target pins and native package manifests have been updated to:
+- Starling/Horizon source: `ff303502a4f7982551a0e0d3622d9268efe9e829`
+- global `horizon-mixins`: `5a64af938ec86b00d53d16a408aabc0038fb3e57`
+
+The GitHub Actions workflow now checks out the exact `v0.9.0` tag and verifies that commit before invoking Starling's own `native_build.sh`.
+
+- 0.9.0 build run: [44875302971](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44875302971) — queued at the time of this update.
+- Source package workflow: [44875262029](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44875262029) — completed successfully for the updated native manifest and source package.
+
+A successful package ZIP workflow only proves archive generation and its local structural checks. It does not prove that Starling's 0.9.0 importer accepts it or that the native bundle compiles. The 0.9.0 Android build run must finish successfully before claiming source compatibility.
+
