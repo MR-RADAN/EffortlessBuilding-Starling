@@ -42,6 +42,9 @@ impl NativePreflightBlock {
 pub(super) struct NativePreflightPlan {
     pub selection: crate::game::effortless_building::SelectionPoints,
     pub tool: usize,
+    /// Registry-scoped target state resolved from the offhand block item.
+    /// The selection stick stays in the main hand; the offhand is the material palette.
+    pub target_state: horizon_world::registry::BlockStateId,
     pub blocks: Vec<NativePreflightBlock>,
 }
 
@@ -53,6 +56,7 @@ pub(super) enum NativePreflightError {
     UnloadedChunk { index: usize },
     OutsideBorder { index: usize },
     NoSelectionCornerInReach,
+    MissingOffhandBlock,
     UnresolvedState { index: usize },
 }
 
@@ -143,6 +147,18 @@ impl Game<'_> {
         {
             return Err(NativePreflightError::NotAuthoritativePlayer);
         }
+        // The main hand is reserved for the selection stick. Resolve the
+        // intended material from the offhand block item, without consuming it.
+        // Items without a same-named default block state are rejected rather
+        // than guessed (some item/block mappings are intentionally non-1:1).
+        let target_item = self.offhand.as_ref()
+            .filter(|stack| stack.count > 0)
+            .ok_or(NativePreflightError::MissingOffhandBlock)?;
+        let target_state = self.pack.assets.registry
+            .default_state(target_item.item.as_ref())
+            .filter(|state| self.pack.assets.registry.state(*state).is_some())
+            .ok_or(NativePreflightError::MissingOffhandBlock)?;
+
         let layout = self.world.layout();
         let reach = self.reach() + 1.0;
         let eye = self.eye_position();
@@ -186,6 +202,7 @@ impl Game<'_> {
         Ok(NativePreflightPlan {
             selection,
             tool,
+            target_state,
             blocks: snapshot,
         })
     }
