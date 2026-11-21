@@ -13,6 +13,8 @@ These pins must not be replaced with newer template pins without checking the us
 - Reverse transaction planning with repeated-position coalescing.
 - Chunk-aware batch grouping, including negative coordinates.
 - Deterministic capped preview sampling.
+- Checked dimension multiplication for cuboids, floors and walls; wall Y-coordinate overflow is rejected before generation.
+- Regression tests added for extreme coordinate ranges and wall-height overflow (not executed in this environment).
 
 ## Not implemented or verified
 - No Horizon hooks are connected.
@@ -21,7 +23,7 @@ These pins must not be replaced with newer template pins without checking the us
 - No inventory consumption or Unlimited Blocks implementation exists.
 - No server-authority or multiplayer behavior has been tested.
 - No .hnmod package has been produced.
-- Rust tests and Cargo checks have not run here because Rust/Cargo are unavailable.
+- Rust tests and Cargo checks have not run here because Rust/Cargo are unavailable. The latest overflow-regression tests are committed but remain unexecuted.
 
 ## Adapter safety requirements
 1. Preview must be read-only.
