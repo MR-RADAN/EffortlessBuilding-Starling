@@ -798,3 +798,121 @@ mod overflow_regression_tests {
         assert_eq!(wall(a, b, u32::MAX, Limits::default()), Err(GeometryError::TooManyBlocks));
     }
 }
+
+
+/// Failure while preparing or validating an all-or-nothing world transaction.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TransactionError {
+    TooManyBlocks,
+    MissingSnapshot,
+    StateChanged,
+}
+
+/// Build a transaction only from a complete before-state snapshot.
+/// Duplicate positions are coalesced; unchanged positions are omitted.
+pub fn prepare_changes(
+    positions: &[BlockPos],
+    before: &BTreeMap<BlockPos, u32>,
+    after_state: u32,
+    cap: usize,
+) -> Result<Vec<BlockChange>, TransactionError> {
+    if positions.len() > cap {
+        return Err(TransactionError::TooManyBlocks);
+    }
+    let unique: BTreeSet<_> = positions.iter().copied().collect();
+    if unique.len() > cap {
+        return Err(TransactionError::TooManyBlocks);
+    }
+    let mut changes = Vec::with_capacity(unique.len());
+    for pos in unique {
+        let before_state = *before.get(&pos).ok_or(TransactionError::MissingSnapshot)?;
+        if before_state != after_state {
+            changes.push(BlockChange { pos, before_state, after_state });
+        }
+    }
+    Ok(changes)
+}
+
+/// Verify every affected position before undo/redo. Any mismatch rejects the
+/// entire operation; callers must not apply a partial inverse.
+pub fn validate_transaction_state(
+    changes: &[BlockChange],
+    current: &BTreeMap<BlockPos, u32>,
+    expect_after: bool,
+    cap: usize,
+) -> Result<(), TransactionError> {
+    if changes.len() > cap {
+        return Err(TransactionError::TooManyBlocks);
+    }
+    for change in changes {
+        let expected = if expect_after { change.after_state } else { change.before_state };
+        if current.get(&change.pos).copied() != Some(expected) {
+            return Err(TransactionError::StateChanged);
+        }
+    }
+    Ok(())
+}
+
+/// Construct the inverse transaction after the caller has validated that all
+/// positions still contain the expected after-state.
+pub fn inverse_changes(
+    changes: &[BlockChange],
+    cap: usize,
+) -> Result<Vec<BlockChange>, TransactionError> {
+    undo_order(changes, cap).map_err(|error| match error {
+        GeometryError::TooManyBlocks => TransactionError::TooManyBlocks,
+        _ => TransactionError::MissingSnapshot,
+    })
+}
+
+#[cfg(test)]
+mod transaction_safety_tests {
+    use super::*;
+
+    #[test]
+    fn transaction_requires_a_complete_snapshot_before_any_commit() {
+        let a = BlockPos::new(1, 2, 3);
+        let b = BlockPos::new(2, 2, 3);
+        let positions = [a, b];
+        let snapshot = BTreeMap::from([(a, 4)]);
+        assert_eq!(
+            prepare_changes(&positions, &snapshot, 9, 16),
+            Err(TransactionError::MissingSnapshot)
+        );
+    }
+
+    #[test]
+    fn transaction_coalesces_positions_and_omits_unchanged_states() {
+        let a = BlockPos::new(1, 2, 3);
+        let b = BlockPos::new(2, 2, 3);
+        let positions = [a, b, a];
+        let snapshot = BTreeMap::from([(a, 4), (b, 9)]);
+        assert_eq!(
+            prepare_changes(&positions, &snapshot, 9, 16).unwrap(),
+            vec![BlockChange { pos: a, before_state: 4, after_state: 9 }]
+        );
+    }
+
+    #[test]
+    fn undo_preflight_rejects_intervening_player_edits() {
+        let a = BlockPos::new(1, 2, 3);
+        let changes = [BlockChange { pos: a, before_state: 4, after_state: 9 }];
+        let current = BTreeMap::from([(a, 7)]);
+        assert_eq!(
+            validate_transaction_state(&changes, &current, true, 16),
+            Err(TransactionError::StateChanged)
+        );
+    }
+
+    #[test]
+    fn undo_preflight_accepts_only_the_exact_expected_state() {
+        let a = BlockPos::new(1, 2, 3);
+        let changes = [BlockChange { pos: a, before_state: 4, after_state: 9 }];
+        let current = BTreeMap::from([(a, 9)]);
+        assert_eq!(validate_transaction_state(&changes, &current, true, 16), Ok(()));
+        assert_eq!(
+            inverse_changes(&changes, 16).unwrap(),
+            vec![BlockChange { pos: a, before_state: 9, after_state: 4 }]
+        );
+    }
+}
