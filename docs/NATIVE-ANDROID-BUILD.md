@@ -37,7 +37,7 @@ spatial preview, read block snapshots, place blocks, or implement undo/redo.
 No block-edit API is called, so this milestone cannot alter the world.
 
 
-## Starling 0.9.0 validation — build toolchain correction in progress
+## Starling 0.9.0 validation — ARM64 compilation in progress
 
 The project target pins and native package manifests have been updated to:
 - Starling/Horizon source: `ff303502a4f7982551a0e0d3622d9268efe9e829`
@@ -45,8 +45,10 @@ The project target pins and native package manifests have been updated to:
 
 The GitHub Actions workflow now checks out the exact `v0.9.0` tag and verifies that commit before invoking Starling's own `native_build.sh`.
 
-- 0.9.0 build run: [44875302971](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44875302971) — failed before Rust compilation because the installed toolchain lacked the `rust-src` component required by Starling's Android standard-library build. The mixin transformation itself completed successfully: 7 injections and 1 module were applied. The workflow now explicitly installs `rust-src`; a new run is expected from the subsequent workflow-path commit.
-- Source package workflow: [44875262029](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44875262029) — completed successfully for the updated native manifest and source package.
+- 0.9.0 build run [44875302971](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44875302971) failed before Rust compilation because `rust-src` was missing. The mixin transformation completed with seven injections and one module. The workflow now installs `rust-src`.
+- The first corrected retry [44875870180](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44875870180) passed source checkout, revision verification, SDK installation and Rust setup, and entered the native compilation step.
+- The two-point selection hook and its native module are included in the latest source commit `ecf9715aa404bc3d56faa19faeb84c7aeb0238e1`. The latest full build [44876097203](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44876097203) is progressing through the corrected toolchain and will compile this source revision.
+- Source package workflow [44876097132](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44876097132) completed successfully and uploaded `effortless_building-0.1.0-hnmod` (6,406 bytes). This validates archive creation and the package workflow's structural checks, not native compilation or in-game behavior.
 
 A successful package ZIP workflow only proves archive generation and its local structural checks. It does not prove that Starling's 0.9.0 importer accepts it or that the native bundle compiles. The retry must finish successfully before claiming source compatibility.
 
