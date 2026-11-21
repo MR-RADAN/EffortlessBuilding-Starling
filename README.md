@@ -22,8 +22,10 @@ This uses the game's own block ray pick and refuses remote multiplayer clients.
 A separate read-only world-render hook draws a selection wireframe plus up to
 64 evenly distributed sample crosses. The screen reports the geometric
 target-position count and flags selections above the 8,192-position native planner
-limit. These previews do not read block states or modify the world. The
-selection and render hooks are awaiting native build validation.
+limit. These previews do not read block states or modify the world. The latest SDK 0.2 workflow validates declared helper syntax, the signed SDK
+pin, manifest, and `.hmod` packaging. It does not type-check injected helpers
+inside the full Starling game crate or validate launcher import; those remain
+separate gates.
 
 ## Implemented in the pure Rust core
 
