@@ -1266,3 +1266,140 @@ mod build_queue_tests {
         assert_eq!(BuildQueue::new(duplicate, 8), Err(GeometryError::InvalidBatchSize));
     }
 }
+
+
+/// Read-only facts collected by the Horizon adapter for one planned target.
+/// These flags must come from the pinned live world APIs; this core type does
+/// not claim to query the game world itself.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct WorldPreflightInput {
+    pub pos: BlockPos,
+    pub within_height: bool,
+    pub chunk_loaded: bool,
+    pub inside_border: bool,
+    pub within_reach: bool,
+    pub before_state: Option<u32>,
+}
+
+/// Compact before-state record retained only after the whole preflight passes.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PreflightBlock {
+    pub pos: BlockPos,
+    pub before_state: u32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PreflightError {
+    TooManyTargets,
+    CountMismatch,
+    PositionMismatch { index: usize },
+    DuplicateTarget { index: usize },
+    OutsideHeight { index: usize },
+    UnloadedChunk { index: usize },
+    OutsideBorder { index: usize },
+    OutOfReach { index: usize },
+    UnresolvedState { index: usize },
+}
+
+/// Validate a frozen coordinate list against adapter-supplied world facts.
+/// This function is pure: it performs no world reads, writes, chunk loads or
+/// inventory operations. The adapter must collect one input per target in
+/// exactly the same order and must abort if the live world changes before
+/// the later commit phase.
+pub fn preflight_targets(
+    targets: &[BlockPos],
+    facts: &[WorldPreflightInput],
+    cap: usize,
+) -> Result<Vec<PreflightBlock>, PreflightError> {
+    if targets.len() > cap {
+        return Err(PreflightError::TooManyTargets);
+    }
+    if targets.len() != facts.len() {
+        return Err(PreflightError::CountMismatch);
+    }
+
+    let mut seen = BTreeSet::new();
+    let mut before = Vec::with_capacity(targets.len());
+    for (index, (&target, fact)) in targets.iter().zip(facts).enumerate() {
+        if target != fact.pos {
+            return Err(PreflightError::PositionMismatch { index });
+        }
+        if !seen.insert(target) {
+            return Err(PreflightError::DuplicateTarget { index });
+        }
+        if !fact.within_height {
+            return Err(PreflightError::OutsideHeight { index });
+        }
+        if !fact.chunk_loaded {
+            return Err(PreflightError::UnloadedChunk { index });
+        }
+        if !fact.inside_border {
+            return Err(PreflightError::OutsideBorder { index });
+        }
+        if !fact.within_reach {
+            return Err(PreflightError::OutOfReach { index });
+        }
+        let state = fact.before_state.ok_or(PreflightError::UnresolvedState { index })?;
+        before.push(PreflightBlock { pos: target, before_state: state });
+    }
+    Ok(before)
+}
+
+#[cfg(test)]
+mod world_preflight_tests {
+    use super::*;
+
+    fn fact(pos: BlockPos) -> WorldPreflightInput {
+        WorldPreflightInput {
+            pos, within_height: true, chunk_loaded: true,
+            inside_border: true, within_reach: true, before_state: Some(17),
+        }
+    }
+
+    #[test]
+    fn preflight_returns_compact_snapshots_only_when_all_targets_pass() {
+        let targets = [BlockPos::new(1, 2, 3), BlockPos::new(-4, 5, 6)];
+        let facts = [fact(targets[0]), fact(targets[1])];
+        assert_eq!(preflight_targets(&targets, &facts, 8), Ok(vec![
+            PreflightBlock { pos: targets[0], before_state: 17 },
+            PreflightBlock { pos: targets[1], before_state: 17 },
+        ]));
+    }
+
+    #[test]
+    fn preflight_rejects_unloaded_chunk_without_partial_snapshot() {
+        let p = BlockPos::new(0, 4, 0);
+        let mut f = fact(p);
+        f.chunk_loaded = false;
+        assert_eq!(preflight_targets(&[p], &[f], 8), Err(PreflightError::UnloadedChunk { index: 0 }));
+    }
+
+    #[test]
+    fn preflight_rejects_each_invalid_world_fact() {
+        let p = BlockPos::new(0, 4, 0);
+        let cases = [
+            (WorldPreflightInput { within_height:false, ..fact(p) }, PreflightError::OutsideHeight { index:0 }),
+            (WorldPreflightInput { inside_border:false, ..fact(p) }, PreflightError::OutsideBorder { index:0 }),
+            (WorldPreflightInput { within_reach:false, ..fact(p) }, PreflightError::OutOfReach { index:0 }),
+            (WorldPreflightInput { before_state:None, ..fact(p) }, PreflightError::UnresolvedState { index:0 }),
+        ];
+        for (input, expected) in cases {
+            assert_eq!(preflight_targets(&[p], &[input], 8), Err(expected));
+        }
+    }
+
+    #[test]
+    fn preflight_rejects_mismatched_or_duplicate_inputs() {
+        let a = BlockPos::new(0, 0, 0);
+        let b = BlockPos::new(1, 0, 0);
+        assert_eq!(preflight_targets(&[a], &[], 8), Err(PreflightError::CountMismatch));
+        assert_eq!(preflight_targets(&[a], &[fact(b)], 8), Err(PreflightError::PositionMismatch { index:0 }));
+        assert_eq!(preflight_targets(&[a, a], &[fact(a), fact(a)], 8), Err(PreflightError::DuplicateTarget { index:1 }));
+    }
+
+    #[test]
+    fn preflight_enforces_cap_before_processing() {
+        let p = BlockPos::new(0, 0, 0);
+        assert_eq!(preflight_targets(&[p], &[fact(p)], 0), Err(PreflightError::TooManyTargets));
+    }
+}
