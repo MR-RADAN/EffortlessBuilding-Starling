@@ -3,15 +3,64 @@
 // module still does not read or modify blocks in the world.
 
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::sync::Mutex;
 
 pub const ID: &str = "effortless_building";
 pub const NAME: &str = "Effortless Building";
 pub const VERSION: &str = "0.1.0";
 pub const DESCRIPTION: &str =
-    "Mobile-first building tools: Floor, Wall, Pillar and Cube.";
+    "Mobile-first building tools: Floor, Wall, Pillar and Cube; select two world points with right-click.";
 
 pub const TOOLS: [&str; 4] = ["Floor", "Wall", "Pillar", "Cube"];
 pub const ACTION_CLOSE: i32 = 4;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SelectionPoints {
+    pub first: Option<[i32; 3]>,
+    pub second: Option<[i32; 3]>,
+}
+
+static SELECTION_POINTS: Mutex<SelectionPoints> = Mutex::new(SelectionPoints {
+    first: None,
+    second: None,
+});
+
+/// Record a point from the authoritative in-game block ray pick.
+/// First click sets A, second sets B, and a third starts a fresh pair.
+pub fn record_selection_point(pos: [i32; 3]) {
+    let mut state = SELECTION_POINTS.lock().unwrap_or_else(|e| e.into_inner());
+    match (state.first, state.second) {
+        (None, _) => {
+            state.first = Some(pos);
+            state.second = None;
+        }
+        (Some(_), None) => state.second = Some(pos),
+        (Some(_), Some(_)) => {
+            state.first = Some(pos);
+            state.second = None;
+        }
+    }
+}
+
+pub fn selection_points() -> SelectionPoints {
+    *SELECTION_POINTS.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+pub fn clear_selection_points() {
+    *SELECTION_POINTS.lock().unwrap_or_else(|e| e.into_inner()) = SelectionPoints::default();
+}
+
+pub fn selection_label() -> String {
+    let state = selection_points();
+    match (state.first, state.second) {
+        (None, _) => "Point A: not selected".to_owned(),
+        (Some(a), None) => format!("A: {}, {}, {}  |  select B", a[0], a[1], a[2]),
+        (Some(a), Some(b)) => format!(
+            "A: {}, {}, {}  B: {}, {}, {}",
+            a[0], a[1], a[2], b[0], b[1], b[2]
+        ),
+    }
+}
 
 const NO_ACTION: i32 = -1;
 static PENDING_UI_ACTION: AtomicI32 = AtomicI32::new(NO_ACTION);
@@ -189,7 +238,14 @@ pub fn draw_screen(
 
     game.native_text(
         batch,
-        "Tool selection only — no blocks changed",
+        &selection_label(),
+        [px + 14.0, layout.footer_y - 18.0],
+        0xD6E2EE,
+        false,
+    );
+    game.native_text(
+        batch,
+        "Close, then right-click two blocks to set A and B",
         [px + 14.0, layout.footer_y],
         0xB8C4D0,
         false,
