@@ -303,9 +303,7 @@ impl Game<'_> {
 
                 // At most 64 planned positions, evenly sampled across the
                 // complete deterministic plan. Each marker is three short lines.
-                let cap = 64usize.min(plan.len());
-                for i in 0..cap {
-                    let index = if cap == 1 { 0 } else { i * (plan.len() - 1) / (cap - 1) };
+                for index in eb::sampled_plan_indices(plan.len(), 64) {
                     let p = plan[index];
                     let center = [f64::from(p[0]) + 0.5, f64::from(p[1]) + 0.5, f64::from(p[2]) + 0.5];
                     let d = 0.18;
