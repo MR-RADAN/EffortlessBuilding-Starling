@@ -82,3 +82,28 @@ is still required.
 - Wrench's `Game::use_item` interception: `native-mods/wrench/mixins/wrench/use.rs`
 - Wrench mixin manifest: `native-mods/wrench/mixins/wrench/horizon-mixin.toml`
 - Project implementation notes: `native/effortless-building-v0.1.0/SERVER-HOOK-IMPLEMENTATION.md`
+
+## Starling 0.9.0 write-boundary finding
+
+The pinned Starling source confirms that `Game::with_level`, `Game::level_set`,
+and `Game::level_set_with_flags` are private implementation methods, not a
+native-mod API. The registry's `BlockRegistry::default_state`, `state`, and
+`id` methods are public, but they only resolve/read registry metadata; they
+do not grant world-write access. Do not work around this boundary by reaching
+into private fields, calling vanilla behaviour through an unsafe alias, or
+writing chunk storage directly.
+
+Consequently, the current native bundle must remain read-only until Starling
+exposes a supported native-mod world-edit adapter (or an explicitly supported
+hook with a safe mutable level capability). That adapter must define:
+- authoritative logical-server execution and loaded-chunk/height/border checks;
+- placement survival and update/event semantics equivalent to normal block
+  placement, including neighbour updates and block entities;
+- bounded batch execution with cancellation points and a rollback strategy;
+- a result for every target so partial failure can be reversed safely.
+
+The preflight snapshot is not itself a transaction or a reservation: the
+world can change between preview, confirmation, and commit. A future commit
+must revalidate the complete selection and before-state immediately before
+writing, and must not overwrite a changed target silently. Undo data must be
+captured before the first mutation and retained only for the bounded operation.
