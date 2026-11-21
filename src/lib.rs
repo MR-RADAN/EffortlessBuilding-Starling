@@ -1126,11 +1126,19 @@ impl BuildQueue {
         Ok(Self { changes, cursor: 0 })
     }
 
-    /// Reserve the next bounded slice. The range indexes changes().
-    pub fn reserve_next(&mut self, budget: usize) -> std::ops::Range<usize> {
-        let start = self.cursor;
-        self.cursor = self.cursor.saturating_add(budget).min(self.changes.len());
-        start..self.cursor
+    /// Inspect the next bounded slice without advancing progress.
+    /// The adapter must call commit_batch only after every edit in the slice succeeds.
+    pub fn next_range(&self, budget: usize) -> std::ops::Range<usize> {
+        self.cursor..self.cursor.saturating_add(budget).min(self.changes.len())
+    }
+
+    /// Advance only after the authoritative world adapter confirms this exact slice.
+    pub fn commit_batch(&mut self, range: std::ops::Range<usize>) -> bool {
+        if range.start != self.cursor || range.end < range.start || range.end > self.changes.len() {
+            return false;
+        }
+        self.cursor = range.end;
+        true
     }
 
     pub fn changes(&self) -> &[BlockChange] { &self.changes }
@@ -1157,23 +1165,31 @@ mod build_queue_tests {
     #[test]
     fn queue_never_reserves_more_than_the_per_tick_budget() {
         let mut q = queue(100);
-        assert_eq!(q.reserve_next(DEFAULT_BLOCKS_PER_TICK), 0..32);
-        assert_eq!(q.reserve_next(DEFAULT_BLOCKS_PER_TICK), 32..64);
+        let first = q.next_range(DEFAULT_BLOCKS_PER_TICK);
+        assert_eq!(first, 0..32);
+        assert_eq!(q.progress(), (0, 100), "previewing a batch is not progress");
+        assert!(q.commit_batch(first));
+        let second = q.next_range(DEFAULT_BLOCKS_PER_TICK);
+        assert_eq!(second, 32..64);
+        assert!(q.commit_batch(second));
         assert_eq!(q.progress(), (64, 100));
     }
     #[test]
     fn queue_clamps_last_batch_and_stops_when_complete() {
         let mut q = queue(70);
-        assert_eq!(q.reserve_next(32), 0..32);
-        assert_eq!(q.reserve_next(32), 32..64);
-        assert_eq!(q.reserve_next(32), 64..70);
+        for expected in [0..32, 32..64, 64..70] {
+            let range = q.next_range(32);
+            assert_eq!(range, expected);
+            assert!(q.commit_batch(range));
+        }
         assert!(q.is_complete());
-        assert_eq!(q.reserve_next(32), 70..70);
+        assert_eq!(q.next_range(32), 70..70);
     }
     #[test]
     fn zero_budget_does_not_advance_and_cancel_releases_work() {
         let mut q = queue(10);
-        assert_eq!(q.reserve_next(0), 0..0);
+        assert_eq!(q.next_range(0), 0..0);
+        assert!(!q.commit_batch(0..1));
         q.cancel();
         assert_eq!(q.progress(), (0, 0));
         assert!(q.is_complete());
