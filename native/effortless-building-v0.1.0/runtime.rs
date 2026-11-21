@@ -13,6 +13,7 @@ pub const DESCRIPTION: &str =
 
 pub const TOOLS: [&str; 4] = ["Floor", "Wall", "Pillar", "Cube"];
 pub const ACTION_CLOSE: i32 = 4;
+pub const SELECTION_ITEM: &str = "minecraft:stick";
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SelectionPoints {
@@ -250,7 +251,7 @@ pub fn draw_screen(
     );
     game.native_text(
         batch,
-        "Close, then right-click two blocks to set A and B",
+        "Hold a stick; close and right-click two blocks to set A and B",
         [px + 14.0, layout.footer_y],
         0xB8C4D0,
         false,
