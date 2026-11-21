@@ -240,3 +240,23 @@ The new helper has unit tests for successful complete snapshots, unloaded
 chunks, all individual validation failures, duplicate/mismatched input, and
 the hard cap. These tests have been added to source but have not been run in
 this update. No native hook or world write was enabled.
+
+
+## Planner-driven preview and Wall safety gate
+
+The world preview now consumes the same bounded `plan_target_positions`
+geometry as the future placement path, rather than drawing a generic cuboid
+that could disagree with the selected tool. It caches the coordinate plan by
+selection/tool and rebuilds only when either changes. Per-frame rendering
+iterates at most 64 evenly distributed target samples plus the fixed outline,
+keeping the line buffer within its 204-line capacity and avoiding repeated
+8,192-position allocations on mobile.
+
+Wall geometry was deliberately removed from the active planner/count path:
+tool index 1 now returns an invalid/unavailable plan until its plane and
+orientation semantics are defined. The UI states that Wall geometry is not
+finalized. Floor, Pillar, and Cube remain preview-only.
+
+The preview remains read-only. It does not validate world state, choose a
+material, ask for confirmation, or write blocks. No compile or device test
+was run for these changes.
