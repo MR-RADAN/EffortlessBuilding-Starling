@@ -37,9 +37,10 @@ Historical 0.8.0 build and pin information is retained in
   reaching the world.
 - The native UI exposes the four initial tools and reports the current point
   selection. A cancellable `Game::use_item` hook mirrors Starling's Wrench
-  pattern: with the mod enabled, a main-hand right-click records the block
-  under the player's ray pick. First click sets A, second sets B, and a third
-  starts a new pair. The hook deliberately refuses remote multiplayer clients.
+  pattern: with the mod enabled, a main-hand right-click while holding a stick records the block under the
+  player's ray pick. Other held items retain normal use behavior. First click
+  sets A, second sets B, and a third starts a new pair. The hook deliberately
+  refuses remote multiplayer clients.
 - This point-capture implementation is source-only until the next native
   Android build validates the new `use_item` hook and module.
 
