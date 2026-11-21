@@ -16,8 +16,12 @@ Floor/Wall/Pillar/Cube and close while capturing clicks inside its panel.
 The screen now explains the two-point workflow. With the mod enabled, a
 main-hand right-click while holding a stick records point A, a second records
 point B, and a third starts a new pair. Other held items retain normal use.
-This uses the game's own block ray pick and refuses remote multiplayer clients. The new hook is awaiting native build
-validation; it does not preview or modify blocks.
+This uses the game's own block ray pick and refuses remote multiplayer clients.
+A separate read-only world-render hook draws a selection wireframe plus up to
+64 evenly distributed sample crosses. The screen reports the geometric
+target-position count and flags selections above the 16,384-position core
+limit. These previews do not read block states or modify the world. The
+selection and render hooks are awaiting native build validation.
 
 ## Implemented in the pure Rust core
 
@@ -56,12 +60,11 @@ implementation.
 
 ## Not yet implemented or verified
 
-- Actual ghost-block previews, live world snapshot/block-edit adapter and commit.
-- Live world snapshot and block-edit adapter.
+- Per-block ghost-state preview and live world snapshot/block-edit adapter.
 - Placement commit, conflict-aware live undo/redo and persistent history.
 - Inventory consumption and authoritative Unlimited Blocks behavior.
 - Runtime testing in Starling 0.9.0 on Android/POCO F5.
-- A final phone-importable `.hnmod` package.
+- Launcher build-service import validation and a tested release package.
 
 See [docs/PORTING-STATUS.md](docs/PORTING-STATUS.md),
 [docs/STARLING-0.9.0-COMPATIBILITY-AUDIT.md](docs/STARLING-0.9.0-COMPATIBILITY-AUDIT.md),
