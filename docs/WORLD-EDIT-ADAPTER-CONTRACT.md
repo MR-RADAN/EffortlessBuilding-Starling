@@ -2,8 +2,10 @@
 
 This contract is based on the pinned Starling source revision
 `ff303502a4f7982551a0e0d3622d9268efe9e829`, specifically
-`game/modding/native_world_edit.rs`, `native_world_columns.rs`,
-`native_world_read.rs`, and `game/blocks/block_edits.rs`.
+`crates/horizon-client/src/game/modding/native_world_edit.rs`,
+`native_world_columns.rs`, `native_world_read.rs`, and
+`crates/horizon-client/src/game/blocks/block_edits.rs` (plus the typed edit
+preparation in `game/modding/api_values/block_edit.rs`).
 
 ## Verified 0.9.0 engine path
 
@@ -42,12 +44,16 @@ Before showing confirmation:
    server level. Do not attempt client-side or remote multiplayer edits.
 2. Generate the full intended position set from the geometry core and enforce
    the operation cap before allocating large snapshots.
-3. Group positions by chunk/column. Read only loaded columns using the
-   0.9.0 server column-read path, in calls no larger than 1,048,576 block
-   positions.
+3. Group positions by chunk/column. First call `surface_heights` for every
+   target `(x, z)` column (at most 65,536 columns per call) and abort if any
+   result is `None`. This is mandatory: `read_columns` represents unloaded
+   columns as air in its returned palette/index stream, so a read alone cannot
+   distinguish an unloaded target column from real air. After the loaded-column
+   preflight succeeds, call `read_columns` in batches no larger than 1,048,576
+   block positions.
 4. Reconstruct the exact before-state for every intended position from the
-   returned bases, palette and block indices. If any target column is
-   unloaded, any index is invalid, or any position is outside the returned
+   returned bases, palette and block indices. If any preflight height is
+   missing, any index is invalid, or any position is outside the returned
    range, abort the entire operation.
 5. Reject block entities and states whose restoration semantics are not
    proven. Bulk edits cannot preserve arbitrary block-entity NBT.
@@ -94,3 +100,7 @@ It must never bypass a multiplayer server's authority.
 This document describes verified Starling 0.9.0 engine capabilities and the
 required adapter safeguards. It does not claim the adapter itself has been
 implemented, compiled, or runtime-tested.
+
+## Source-path clarification
+
+The exact Starling 0.9.0 files are under `crates/horizon-client/src/game/`, not a repository-root `game/` directory. In particular, `surface_heights` is the required loaded-column preflight because `read_columns` fills unloaded columns with air. The adapter must never infer "loaded and air" from the column read alone.
