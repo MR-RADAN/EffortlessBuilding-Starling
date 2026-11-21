@@ -53,7 +53,7 @@ Historical 0.8.0 build and pin information is retained in
 - The 0.9.0 adapter has rewritten all nine hook targets, including `use_item`
   and `submit_custom_geometry`; the first compile attempt then caught a duplicate
   module/injection ID before Rust compilation. The injection ID is now
-  `world_preview`; the corrected native build is running.
+  `world_preview`; the corrected ARM64 build is queued/running through its compile step.
 
 ## Starling 0.9.0 source audit
 
@@ -100,7 +100,11 @@ Verified directly against the pinned source:
   with `E_DUPLICATE_ID` because the module and injection both used `preview`.
 - The injection ID was changed to `world_preview`. Corrected build
   [44877289336](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44877289336)
-  is now validating the full native bundle against the exact 0.9.0 source.
+  was cancelled before a result was produced. The current retry
+  [44878280143](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44878280143)
+  passed source pin verification, Android SDK setup, Rust Android toolchain setup
+  and disk preparation. At the latest check its ARM64 compile step was still
+  running; no compiled library artifact is available yet.
 
 ## Not yet implemented or verified
 
