@@ -110,18 +110,4 @@ bindings = [
   { name = "screen", ty = "&crate::mod_api::NativeScreenView<'_>", value = "screen" },
   { name = "button", ty = "i32", value = "button" },
   { name = "_modifiers", ty = "u32", value = "modifiers" },
-  { name = "canceled", ty = "&mut bool", value = "&mut *canceled" },
-]
-
-[[native.mixin]]
-id = "screen_release"
-kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_screen_mouse_button_released_post"
-helper = "src/mixins/screen_release.rs"
-bindings = [
-  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
-  { name = "screen", ty = "&crate::mod_api::NativeScreenView<'_>", value = "screen" },
-  { name = "button", ty = "i32", value = "button" },
-  { name = "_modifiers", ty = "u32", value = "modifiers" },
-  { name = "canceled", ty = "&mut bool", value = "&mut *canceled" },
 ]
