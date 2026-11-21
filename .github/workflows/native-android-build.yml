@@ -8,6 +8,10 @@ on:
       - "native/effortless-building-v0.1.0/**"
       - ".github/workflows/native-android-build.yml"
 
+concurrency:
+  group: native-android-build-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
