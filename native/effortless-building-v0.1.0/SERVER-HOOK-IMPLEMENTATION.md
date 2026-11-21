@@ -165,3 +165,53 @@ semantics are not a true wall plane. It must be treated as unavailable for
 placement until the intended orientation is defined and all three layers use
 the same plane geometry. The existing planner is not yet wired into UI preview,
 and no placement path should consume it yet.
+
+
+## Pinned Horizon source recovered — exact revision verified
+
+The upstream repository is `starling-client/starling`, and the pinned commit
+`ff303502a4f7982551a0e0d3622d9268efe9e829` is readable. The reference
+implementation was fetched directly from that commit:
+
+- `native-mods/wrench/mixins/wrench/native.rs`
+- `native-mods/wrench/mixins/wrench/use.rs`
+- `crates/horizon-client/src/game/modding/native_world_edit.rs`
+
+The Wrench source confirms the exact preflight pattern for this legacy
+`.hnmod` integration:
+
+- vertical bounds: `self.world.layout().min_y()` inclusive and
+  `max_y()` exclusive;
+- loaded-chunk check: `self.world.loaded(x, z)`;
+- border check: `self.border.contains(f64::from(x), f64::from(z))`;
+- player reach: `self.reach()` plus eye-position distance;
+- current block read: `self.world.block(x, y, z)`;
+- state resolution: `self.pack.assets.registry.state(state)`;
+- mutation reference only: `self.with_level(... b.set_block(...,
+  flags::UPDATE_ALL))`, followed by `process_level_events()`.
+
+The separate `Game::edit_blocks` helper is explicitly server-mod-only and
+requires `native_level_open(dimension)`; it is not callable from this
+legacy Game mixin. It also skips unloaded chunks rather than loading them.
+
+## Read-only preflight design (not yet wired)
+
+The next adapter should first create a frozen target list using the existing
+8,192-position planner cap, then walk it without yielding to a world write:
+
+1. Reject remote clients, spectators, and non-acting contexts using the same
+   Wrench authority gates.
+2. Check each target's Y range, loaded chunk, world border, and reach.
+3. Read each current state and require successful registry resolution.
+4. Store compact before-state records only after every target passes.
+5. Return a typed preflight result; do not mutate, load chunks, or consume
+   inventory in this phase.
+
+Only a fully successful preflight may be presented for a separate explicit
+confirmation. A future commit phase must revalidate mutable assumptions before
+writing, use bounded batches, and report partial failure honestly. The
+preflight helper itself remains read-only. Wall placement stays disabled
+until the plane orientation is specified consistently in planner, count,
+and preview.
+
+No source compilation or device test was run in this update.
