@@ -233,6 +233,18 @@ impl Game<'_> {
             return false;
         }
 
+        let Some(target_item) = self.offhand.as_ref().filter(|stack| stack.count > 0) else {
+            return false;
+        };
+        let Some(target_state) = self.pack.assets.registry.default_state(target_item.item.as_ref()) else {
+            return false;
+        };
+        if target_state != plan.target_state
+            || self.pack.assets.registry.state(target_state).is_none()
+        {
+            return false;
+        }
+
         let layout = self.world.layout();
         let reach = self.reach() + 1.0;
         let eye = self.eye_position();
