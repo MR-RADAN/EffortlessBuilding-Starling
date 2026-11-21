@@ -26,6 +26,11 @@ impl Game<'_> {
             _ => return None,
         }
 
+        let held = self.inventory.get(self.selected).and_then(Option::as_ref)?;
+        if *held.item != *eb::SELECTION_ITEM {
+            return None;
+        }
+
         let hit = self.pick()?;
         let pos = hit.pos;
         let recorded = self.with_player_actor(|_game| {
