@@ -57,3 +57,46 @@ No installable artifact or successful native build is claimed by this audit.
 ## Maintainer
 
 MR
+
+
+## Exact legacy .hnmod importer contract (confirmed in v0.9.0)
+
+The v0.9.0 source's `crates/horizon-mod-package/src/index/native/legacy.rs` is decisive: the phone still imports the Starling legacy source bundle, not the flat `.hmod` package layout.
+
+The ZIP must contain:
+- `horizon-native.json` at the archive root.
+- Source files only under `mixins/<id>/`.
+- `mixins/<id>/horizon-mixin.toml` and its referenced Rust helpers/modules.
+
+The JSON manifest is strict (`deny_unknown_fields`) and requires:
+- `schema: 1`
+- valid lowercase `id`
+- non-empty `version` and `game`
+- exact 40-character lowercase-hex `horizon` commit
+- exact 40-character lowercase-hex `mixins` commit
+- optional positive `hooks` integer.
+
+The importer checks that JSON `id`, `version`, and `horizon` exactly match `[mod].id`, `[mod].version`, and `[compatibility].horizon_revision` in the mixin TOML. It rejects unknown fields, unsafe paths, duplicate entries, unexpected files and packages above 64 MiB expanded source / 512 entries.
+
+**Important distinction:** the in-tree Wrench source bundle's `horizon-native.json` is used as a build input inside Starling's own repository. Its shortened metadata is not a valid example of the phone-imported legacy `.hnmod` manifest. The strict legacy importer requires `horizon` as well as `mixins`.
+
+## This project's pins updated
+
+The repository now records:
+- Starling/Horizon source: `ff303502a4f7982551a0e0d3622d9268efe9e829`
+- global horizon-mixins: `5a64af938ec86b00d53d16a408aabc0038fb3e57`
+
+The project's `VERSION.json`, native JSON manifest and `horizon-mixin.toml` compatibility pin have been updated to these exact revisions. The old screen/settings injections remain legacy hook targets and rely on Starling's adapter; their compatibility is not proven until the v0.9.0 build actually runs.
+
+## Build-service availability
+
+The v0.9.0 source publishes Starling's default gateway address in `packaging/android/build-server.txt`:
+
+`https://starling-compile.starling-client.workers.dev`
+
+The gateway's documentation says each release needs its own source commit in the server-side `versions.json`; GitHub-runner builds additionally need the version in `starling-client/mod-builds/versions.json` and a clean base workflow run. The public GitHub-runner map checked on 2026-11-21 still lists only 0.8.0. The server-side registry is not public in the source repository, and the gateway was not exercised from this audit. Thus v0.9.0 compilation remains unverified; the GitHub-runner path is not currently evidenced as configured for 0.9.0.
+
+## Immediate next engineering gate
+
+Before changing screen or world-edit code, run the source-only bundle through the v0.9.0 importer and compile pipeline. If the default gateway rejects the version, the release owner must publish the 0.9.0 source commit and clean cache to the build service (and the GitHub-runner map if that route is intended). Only after a clean build should the legacy UI hooks be debugged and the block-edit adapter implemented.
+
