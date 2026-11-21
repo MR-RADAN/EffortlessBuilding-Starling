@@ -1,6 +1,12 @@
 name: Check native mod bundle and pinned SDK
 
 on:
+  push:
+    branches:
+      - migration/native-sdk-0.2
+    paths:
+      - "native/effortless-building-v0.1.0/**"
+      - ".github/workflows/native-sdk-check.yml"
   pull_request:
     paths:
       - "native/effortless-building-v0.1.0/**"
