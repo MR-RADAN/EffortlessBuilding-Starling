@@ -20,26 +20,31 @@ pub struct SelectionPoints {
     pub second: Option<[i32; 3]>,
 }
 
+impl SelectionPoints {
+    /// First point sets A, second sets B, and a third starts a fresh pair.
+    pub fn record(&mut self, pos: [i32; 3]) {
+        match (self.first, self.second) {
+            (None, _) => {
+                self.first = Some(pos);
+                self.second = None;
+            }
+            (Some(_), None) => self.second = Some(pos),
+            (Some(_), Some(_)) => {
+                self.first = Some(pos);
+                self.second = None;
+            }
+        }
+    }
+}
+
 static SELECTION_POINTS: Mutex<SelectionPoints> = Mutex::new(SelectionPoints {
     first: None,
     second: None,
 });
 
 /// Record a point from the authoritative in-game block ray pick.
-/// First click sets A, second sets B, and a third starts a fresh pair.
 pub fn record_selection_point(pos: [i32; 3]) {
-    let mut state = SELECTION_POINTS.lock().unwrap_or_else(|e| e.into_inner());
-    match (state.first, state.second) {
-        (None, _) => {
-            state.first = Some(pos);
-            state.second = None;
-        }
-        (Some(_), None) => state.second = Some(pos),
-        (Some(_), Some(_)) => {
-            state.first = Some(pos);
-            state.second = None;
-        }
-    }
+    SELECTION_POINTS.lock().unwrap_or_else(|e| e.into_inner()).record(pos);
 }
 
 pub fn selection_points() -> SelectionPoints {
@@ -288,5 +293,22 @@ mod tests {
         assert_eq!(ui_action_at(&layout, center(layout.tools[2])), Some(2));
         assert_eq!(ui_action_at(&layout, center(layout.close)), Some(ACTION_CLOSE));
         assert_eq!(ui_action_at(&layout, [0.0, 0.0]), None);
+    }
+}
+
+
+#[cfg(test)]
+mod selection_point_tests {
+    use super::*;
+
+    #[test]
+    fn two_points_are_captured_and_third_click_starts_a_new_pair() {
+        let mut selection = SelectionPoints::default();
+        selection.record([1, 2, 3]);
+        assert_eq!(selection, SelectionPoints { first: Some([1, 2, 3]), second: None });
+        selection.record([4, 5, 6]);
+        assert_eq!(selection, SelectionPoints { first: Some([1, 2, 3]), second: Some([4, 5, 6]) });
+        selection.record([-7, 8, 9]);
+        assert_eq!(selection, SelectionPoints { first: Some([-7, 8, 9]), second: None });
     }
 }
