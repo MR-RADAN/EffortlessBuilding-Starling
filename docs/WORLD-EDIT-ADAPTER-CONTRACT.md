@@ -104,3 +104,24 @@ implemented, compiled, or runtime-tested.
 ## Source-path clarification
 
 The exact Starling 0.9.0 files are under `crates/horizon-client/src/game/`, not a repository-root `game/` directory. In particular, `surface_heights` is the required loaded-column preflight because `read_columns` fills unloaded columns with air. The adapter must never infer "loaded and air" from the column read alone.
+
+
+## Mod-facing API boundary
+
+The engine helpers in `game/modding/native_world_edit.rs` and
+`native_world_columns.rs` are `pub(super)` methods on the internal `Game`
+implementation. A mixin module placed beside `game.rs` must not assume it can
+call those private helpers directly. The supported mod-facing route is the
+public `ServerHost` API declared in
+`crates/horizon-mod-vocab/src/host/world_edit.rs`: `surface_heights`,
+`read_columns`, and `edit_blocks`. The adapter therefore needs to execute
+inside a server-side native-mod callback that receives `&mut dyn ServerHost`
+(or an equivalent supported host handle), and it must keep preview/UI intent
+separate from the authoritative server callback. Do not work around this
+visibility boundary by reaching into private `Game` fields or by injecting a
+client-side write.
+
+The existing mixin integration currently captures selection and draws a
+read-only preview; it is not yet a `ServerHost` callback implementation. The
+next implementation milestone is to add a proper server native-mod hook and
+route snapshot, commit, undo and redo through its `ServerHost` methods.
