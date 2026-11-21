@@ -58,6 +58,7 @@ pub fn selection_points() -> SelectionPoints {
 
 pub fn clear_selection_points() {
     *SELECTION_POINTS.lock().unwrap_or_else(|e| e.into_inner()) = SelectionPoints::default();
+    clear_preflight_status();
 }
 
 pub fn selection_block_count_for(selection: SelectionPoints, tool: usize) -> Option<u128> {
@@ -183,16 +184,29 @@ pub fn selection_label() -> String {
 
 const NO_ACTION: i32 = -1;
 static PENDING_UI_ACTION: AtomicI32 = AtomicI32::new(NO_ACTION);
-static PREFLIGHT_STATUS: Mutex<String> = Mutex::new(String::new());
+static PREFLIGHT_STATUS: Mutex<Option<(SelectionPoints, usize, String)>> = Mutex::new(None);
 
-pub fn preflight_status() -> String {
-    PREFLIGHT_STATUS.lock().unwrap_or_else(|e| e.into_inner()).clone()
+pub fn preflight_status_for(selection: SelectionPoints, tool: usize) -> String {
+    PREFLIGHT_STATUS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .as_ref()
+        .filter(|(checked_selection, checked_tool, _)| {
+            *checked_selection == selection && *checked_tool == tool
+        })
+        .map(|(_, _, status)| status.clone())
+        .unwrap_or_default()
 }
 
-/// A successful preflight is only valid for the exact selection and tool
-/// that were checked. Remove its green status as soon as either changes.
+/// A successful preflight belongs to one exact selection/tool pair.
+/// Mismatched state is never displayed as a current validation result.
+pub fn set_preflight_status(selection: SelectionPoints, tool: usize, status: String) {
+    *PREFLIGHT_STATUS.lock().unwrap_or_else(|e| e.into_inner()) =
+        Some((selection, tool, status));
+}
+
 pub fn clear_preflight_status() {
-    PREFLIGHT_STATUS.lock().unwrap_or_else(|e| e.into_inner()).clear();
+    *PREFLIGHT_STATUS.lock().unwrap_or_else(|e| e.into_inner()) = None;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -311,11 +325,13 @@ pub fn process_pending_ui_action(game: &mut crate::game::Game<'_>) {
             clear_preflight_status();
         }
         ACTION_PREFLIGHT => {
+            let selection = selection_points();
+            let tool = selected_tool(|key| game.native_setting(ID, key));
             let status = match game.effortless_building_preflight_selection() {
                 Ok(plan) => format!("Preflight OK: {} targets validated; no blocks changed", plan.blocks.len()),
                 Err(error) => format!("Preflight failed: {error:?}"),
             };
-            *PREFLIGHT_STATUS.lock().unwrap_or_else(|e| e.into_inner()) = status;
+            set_preflight_status(selection, tool, status);
         }
         ACTION_CLOSE => {
             game.native_mod_screen_close(ID);
@@ -386,7 +402,13 @@ pub fn draw_screen(
         0xD6E2EE,
         false,
     );
-    game.native_text(batch, &preflight_status(), [px + 14.0, layout.footer_y], 0xB8C4D0, false);
+    game.native_text(
+        batch,
+        &preflight_status_for(selection_points(), selected),
+        [px + 14.0, layout.footer_y],
+        0xB8C4D0,
+        false,
+    );
     game.native_text(batch, "Hold a stick; close and right-click two blocks to set A and B", [px + 14.0, layout.footer_y + 12.0], 0xB8C4D0, false);
 }
 
