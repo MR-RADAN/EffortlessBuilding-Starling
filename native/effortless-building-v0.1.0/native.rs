@@ -22,7 +22,17 @@ std::thread_local! {
 /// Kept in the native mixin layer because BlockStateId is an engine type.
 pub(super) struct NativePreflightBlock {
     pub pos: [i32; 3],
-    pub before_state: u32,
+    /// Keep the engine's registry-scoped identity typed until the explicit
+    /// pure-core handoff; never treat this number as globally meaningful.
+    pub before_state: horizon_world::registry::BlockStateId,
+}
+
+impl NativePreflightBlock {
+    /// Exact representation expected by WorldPreflightInput::before_state.
+    /// The caller must keep this record within the same loaded registry/world.
+    pub(super) fn core_before_state(&self) -> u32 {
+        self.before_state.0
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -139,9 +149,8 @@ impl Game<'_> {
             if self.pack.assets.registry.state(state_id).is_none() {
                 return Err(NativePreflightError::UnresolvedState { index });
             }
-            // BlockStateId is a public tuple struct over u32 in the pinned
-            // Horizon revision; preserve its registry-local numeric identity.
-            snapshot.push(NativePreflightBlock { pos, before_state: state_id.0 });
+            // Preserve the typed, registry-scoped ID at the native boundary.
+            snapshot.push(NativePreflightBlock { pos, before_state: state_id });
         }
         Ok(snapshot)
     }
