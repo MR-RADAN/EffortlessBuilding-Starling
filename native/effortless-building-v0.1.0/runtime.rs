@@ -80,9 +80,9 @@ pub fn selection_label_for_tool(tool: usize) -> String {
     let mut label = selection_label();
     if let Some(count) = selection_block_count(tool) {
         if count > 16_384 {
-            label.push_str(&format!(" | {count} blocks (limit 16384)"));
+            label.push_str(&format!(" | {count} target positions (limit 16384)"));
         } else {
-            label.push_str(&format!(" | {count} blocks"));
+            label.push_str(&format!(" | {count} target positions"));
         }
     }
     label
