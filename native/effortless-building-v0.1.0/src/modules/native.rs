@@ -157,7 +157,17 @@ impl Game<'_> {
             .ok_or(NativePreflightError::MissingOffhandStack)?;
         let target_state = self.pack.assets.registry
             .default_state(target_item.item.as_ref())
-            .filter(|state| self.pack.assets.registry.state(*state).is_some())
+            .filter(|state| {
+                self.pack.assets.registry.state(*state).is_some_and(|block| {
+                    // Only accept an exact item-ID/block-ID match. Starling's
+                    // Pick Block path intentionally maps several blocks to
+                    // different items (seeds, crops, stems, potted plants,
+                    // piston heads, etc.); guessing the reverse mapping here
+                    // could place an unrelated block.
+                    block.name.as_str() == target_item.item.as_ref()
+                        && block.name.as_str() != "minecraft:air"
+                })
+            })
             .ok_or(NativePreflightError::UnsupportedOffhandBlockItem)?;
 
         let layout = self.world.layout();
@@ -237,12 +247,18 @@ impl Game<'_> {
         let Some(target_item) = self.offhand.as_ref().filter(|stack| stack.count > 0) else {
             return false;
         };
-        let Some(target_state) = self.pack.assets.registry.default_state(target_item.item.as_ref()) else {
+        let Some(target_state) = self.pack.assets.registry
+            .default_state(target_item.item.as_ref())
+            .filter(|state| {
+                self.pack.assets.registry.state(*state).is_some_and(|block| {
+                    block.name.as_str() == target_item.item.as_ref()
+                        && block.name.as_str() != "minecraft:air"
+                })
+            })
+        else {
             return false;
         };
-        if target_state != plan.target_state
-            || self.pack.assets.registry.state(target_state).is_none()
-        {
+        if target_state != plan.target_state {
             return false;
         }
 
