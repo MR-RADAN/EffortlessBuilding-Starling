@@ -14,9 +14,9 @@ builder tool-selection screen, a pure Rust geometry/transaction core, and
 version-pinned package metadata. The native screen can open, render, select
 Floor/Wall/Pillar/Cube and close while capturing clicks inside its panel.
 The screen now explains the two-point workflow. With the mod enabled, a
-main-hand right-click on a block records point A, a second records point B,
-and a third starts a new pair. This uses the game's own block ray pick and
-refuses remote multiplayer clients. The new hook is awaiting native build
+main-hand right-click while holding a stick records point A, a second records
+point B, and a third starts a new pair. Other held items retain normal use.
+This uses the game's own block ray pick and refuses remote multiplayer clients. The new hook is awaiting native build
 validation; it does not preview or modify blocks.
 
 ## Implemented in the pure Rust core
