@@ -11,7 +11,7 @@ pub const VERSION: &str = "0.1.0";
 pub const MAX_BUILD_BLOCKS: u128 = 8_192;
 pub const LARGE_BUILD_WARNING: u128 = 4_096;
 pub const DESCRIPTION: &str =
-    "Mobile-first building tools: Floor, Wall, Pillar and Cube; select two world points with right-click.";
+    "Mobile-first building tools: Floor, Wall, Pillar and Cube; main-hand stick selects points, offhand block selects material.";
 
 pub const TOOLS: [&str; 4] = ["Floor", "Wall", "Pillar", "Cube"];
 pub const ACTION_PREFLIGHT: i32 = 4;
@@ -421,7 +421,7 @@ pub fn draw_screen(
         0xB8C4D0,
         false,
     );
-    game.native_text(batch, "Hold a stick; close and right-click two blocks to set A and B", [px + 14.0, layout.footer_y + 12.0], 0xB8C4D0, false);
+    game.native_text(batch, "Main hand: stick to select A/B | Offhand: target block", [px + 14.0, layout.footer_y + 12.0], 0xB8C4D0, false);
 }
 
 #[cfg(test)]
