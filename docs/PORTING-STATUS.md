@@ -85,8 +85,8 @@ Verified directly against the pinned source:
 
 - Rust core tests passed for the two-corner geometry commit in run
   [44877215141](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44877215141).
-  Snapshot decoding, guarded undo/redo, bounded history transitions, two-corner
-  selection geometry and overflow regressions are covered by the passing suite.
+  All 46 tests passed: snapshot decoding, guarded undo/redo, bounded history
+  transitions, two-corner selection geometry and overflow regressions.
 - Source package validation passed in run
   [44875262029](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44875262029).
   This validates ZIP structure only, not importer acceptance or compilation.
