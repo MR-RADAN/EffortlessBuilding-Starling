@@ -31,7 +31,7 @@ does not load.
 - A LAN guest may request an action only through the normal acting-player
   path; never mutate the guest's local client copy of a remote server world.
 - Resolve and validate the entire target set before the first write.
-- Enforce the hard cap of 16,384 unique target positions.
+- Enforce the hard cap of 8,192 unique target positions; show a large-build warning above 4,096.
 - Reject out-of-height, unloaded, out-of-border, and otherwise invalid targets.
 - Require a distinct explicit confirmation action after selection/preview.
 - Keep the selection tool and preview read-only; no block changes on point
@@ -64,7 +64,7 @@ Before enabling bulk placement, the adapter must:
    Undo/redo must re-check each current state against the transaction's
    expected state before attempting a guarded change.
 
-The engine API may trigger neighbour updates and block behaviour side effects.
+The native registry path exposes `Game::item_block(ItemKey) -> Option<BlockKey>` and `Game::block_state_default(BlockKey) -> Option<BlockStateId>` in Starling 0.9.0. These establish a registry-backed route from a held block item to its default block state, including special item-to-block bindings such as seeds to crops. They are currently private to Starling's modding implementation and have not yet been proven callable from this mixin module; do not duplicate or guess their internal mapping. Confirm visibility or use a supported registry/behaviour binding before wiring material selection.\n\nThe engine API may trigger neighbour updates and block behaviour side effects.
 A block entity's NBT, inventories, scheduled ticks, and arbitrary side effects
 must not be claimed as preserved unless separately proven. Survival inventory
 consumption and unlimited-block mode remain disabled until a verified item
@@ -78,3 +78,4 @@ bulk world edits, and the UI does not yet contain the required confirmation
 and material-selection flow. The ARM64 native build compiles the mixin bundle
 into Starling's Android library; a successful compile alone is not proof of
 in-game functionality. Device testing on Starling 0.9.0 is still required.
+\n\n## Current verification update\n\nThe core test workflow passed on the current `main` revision (54 tests). The native integration remains a separate compile-and-device-test gate: no block writes are enabled in this revision.\n
