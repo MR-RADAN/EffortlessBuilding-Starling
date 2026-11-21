@@ -57,11 +57,11 @@ the pinned SDK, declared source files, Rust syntax, manifest, and `.hmod`
 packaging. This does not type-check every injected helper inside the game
 crate or prove launcher-side import.
 
-Starling 0.9.0 exposes an authoritative server-side bulk block-edit path and
-bounded column snapshot reads. The required safety contract is documented in
-[docs/WORLD-EDIT-ADAPTER-CONTRACT.md](docs/WORLD-EDIT-ADAPTER-CONTRACT.md).
-The adapter that connects those engine APIs to this mod is not implemented
-yet. Client-side/remote multiplayer edits, implicit chunk loading, and
+The current native mixin follows Starling's in-process Wrench pattern: read-only
+world checks through `Game`, then (when implemented) block behaviour calls
+through `Game::with_level`. The read-only preflight adapter now snapshots and
+revalidates selected target states, but no write path is connected. The required
+safety contract is documented in [docs/WORLD-EDIT-ADAPTER-CONTRACT.md](docs/WORLD-EDIT-ADAPTER-CONTRACT.md). Client-side/remote multiplayer edits, implicit chunk loading, and
 block-entity NBT preservation are explicitly out of scope for the first safe
 implementation.
 
