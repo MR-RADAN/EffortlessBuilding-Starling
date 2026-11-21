@@ -37,6 +37,12 @@ Preserve the three game-module support modules by moving their source paths unde
 - Do not rebuild the Starling ARM64 client. Only build the standalone native mod if and when a verified migration is ready.
 - Confirm the produced package is `.hmod` and validate its manifest/layout; do not label the prior ARM64 ZIP as an importable mod package.
 
-## Outstanding implementation
+## Migration implementation status
 
-This branch currently records the verified migration plan only. No source files have been moved or rewritten yet. Next implementation change should add the generated-format manifests and migrate helpers/modules with exact source preservation, then run package/layout checks before any native compilation.
+The SDK 0.2 project skeleton has now been added alongside the legacy files:
+- `horizon-mod.toml` pins the original Starling/Horizon and mixins revisions and declares all 9 mixins plus all 3 support modules.
+- `Cargo.toml` follows the pinned generator's edition-2024 and local SDK dependency layout.
+- `src/modules/` and `src/mixins/` contain source-preserving copies of all 12 legacy Rust files.
+- `src/lib.rs` and the generated `.gitignore` are present.
+
+The legacy `horizon-mixin.toml` and root-level Rust files remain as reference; they have not been deleted. The new manifest and helper paths were fetched back from the branch for a first textual consistency check. No launcher-side `native-build`, package validation, Rust compilation, or in-game test has run yet. The next gate is to run the official launcher's manifest/layout check and then address any compiler diagnostics. No world-write code has been enabled.
