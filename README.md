@@ -11,8 +11,10 @@
 
 This repository contains a Starling 0.9.0 native bundle scaffold, a mobile
 builder tool-selection screen, a pure Rust geometry/transaction core, and
-version-pinned package metadata. The native screen can open, render, select
-Floor/Wall/Pillar/Cube and close while capturing clicks inside its panel.
+version-pinned package metadata. The native screen renderer and mouse-press Post callback are wired against
+Starling 0.9.0. The Post callback has no cancellation parameter, so click
+suppression/consumption is not established; in-game interaction still needs
+verification. Tool selection and close actions are queued from that callback.
 The screen now explains the two-point workflow. With the mod enabled, a
 main-hand right-click while holding a stick records point A, a second records
 point B, and a third starts a new pair. Other held items retain normal use.

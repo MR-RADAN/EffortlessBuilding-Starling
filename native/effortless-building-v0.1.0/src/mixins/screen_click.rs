@@ -3,7 +3,6 @@ fn effortless_building_screen_click(
     screen: &crate::mod_api::NativeScreenView<'_>,
     button: i32,
     _modifiers: u32,
-    canceled: &mut bool,
 ) {
     use crate::game::effortless_building as m;
 
@@ -16,11 +15,10 @@ fn effortless_building_screen_click(
         return;
     }
 
-    // Own the full left-click lifecycle inside the panel so the world cannot
-    // receive a click intended for this UI.
-    m::capture_left_press();
+    // The native Post hook runs after the screen's input handlers and has no
+    // cancellation parameter. Record the UI action only; never claim that this
+    // callback suppresses the game's underlying mouse event.
     if let Some(action) = m::ui_action_at(&layout, screen.mouse) {
         m::queue_ui_action(action);
     }
-    *canceled = true;
 }

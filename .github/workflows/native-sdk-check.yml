@@ -1,0 +1,89 @@
+name: Check native mod bundle and pinned SDK
+
+on:
+  push:
+    branches:
+      - migration/native-sdk-0.2
+    paths:
+      - "native/effortless-building-v0.1.0/**"
+      - ".github/workflows/native-sdk-check.yml"
+  pull_request:
+    paths:
+      - "native/effortless-building-v0.1.0/**"
+      - ".github/workflows/native-sdk-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-sdk-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out mod source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check out the exact Starling 0.9.0 source
+        uses: actions/checkout@v4
+        with:
+          repository: starling-client/starling
+          ref: ff303502a4f7982551a0e0d3622d9268efe9e829
+          path: starling-source
+          persist-credentials: false
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install pinned cargo-horizon-mod CLI
+        run: cargo install --path starling-source/crates/cargo-horizon-mod --locked
+
+      - name: Validate declared helper files and Rust syntax
+        working-directory: native/effortless-building-v0.1.0
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import tomllib
+
+          root = pathlib.Path(".")
+          manifest = tomllib.loads((root / "horizon-mod.toml").read_text())
+          native = manifest["native"]
+          declared = [row["source"] for row in native.get("module", [])]
+          declared += [row["helper"] for row in native.get("mixin", [])]
+          if not declared:
+              raise SystemExit("manifest declares no native helper sources")
+          for name in declared:
+              path = root / name
+              if not path.is_file():
+                  raise SystemExit(f"missing declared native source: {name}")
+              print(f"Rust syntax: {name}")
+              import subprocess
+              subprocess.run(
+                  ["rustfmt", "--edition", "2024", "--emit", "stdout", str(path)],
+                  check=True, stdout=subprocess.DEVNULL,
+              )
+          PY
+
+      - name: Verify signed SDK pin and check mod crate
+        working-directory: native/effortless-building-v0.1.0
+        run: cargo horizon-mod check
+
+      - name: Package the native source mod
+        working-directory: native/effortless-building-v0.1.0
+        run: |
+          cargo horizon-mod build
+          test -s target/horizon-mod/effortless_building.hmod
+          mv target/horizon-mod/effortless_building.hmod target/horizon-mod/effortless_building-0.1.0.hmod
+          cargo horizon-mod check target/horizon-mod/effortless_building-0.1.0.hmod
+
+      - name: Upload HMOD package
+        uses: actions/upload-artifact@v4
+        with:
+          name: effortless-building-v0.1.0-hmod
+          path: native/effortless-building-v0.1.0/target/horizon-mod/effortless_building-0.1.0.hmod
+          if-no-files-found: error
+          retention-days: 14

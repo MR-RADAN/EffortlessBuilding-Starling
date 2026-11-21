@@ -2,7 +2,7 @@
 // The screen is a UI-only milestone: tool choice is persisted, but this
 // module still does not read or modify blocks in the world.
 
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Mutex;
 
 pub const ID: &str = "effortless_building";
@@ -174,7 +174,6 @@ static PREFLIGHT_STATUS: Mutex<String> = Mutex::new(String::new());
 pub fn preflight_status() -> String {
     PREFLIGHT_STATUS.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
-static CAPTURED_LEFT_PRESS: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct UiLayout {
@@ -189,7 +188,7 @@ pub struct UiLayout {
 pub fn selected_tool(read: impl Fn(&str) -> Option<String>) -> usize {
     read("tool")
         .and_then(|s| s.trim().parse::<usize>().ok())
-        .filter(|i| *i < TOOLS.len())
+        .filter(|i| *i < TOOLS.len() && *i != 1)
         .unwrap_or(0)
 }
 
@@ -200,7 +199,9 @@ pub fn setting_labels(tool: usize) -> Vec<String> {
         .iter()
         .enumerate()
         .map(|(index, name)| {
-            if index == selected {
+            if index == 1 {
+                "[—] Wall (unavailable)".to_owned()
+            } else if index == selected {
                 format!("[x] {name}")
             } else {
                 format!("[ ] {name}")
@@ -262,7 +263,7 @@ pub fn contains(rect: [f32; 4], point: [f32; 2]) -> bool {
 /// Map a screen tap to a tool index or the close action.
 pub fn ui_action_at(layout: &UiLayout, point: [f32; 2]) -> Option<i32> {
     for (index, rect) in layout.tools.iter().enumerate() {
-        if contains(*rect, point) {
+        if index != 1 && contains(*rect, point) {
             return Some(index as i32);
         }
     }
@@ -276,14 +277,6 @@ pub fn queue_ui_action(action: i32) {
     if (0..=ACTION_CLOSE).contains(&action) {
         PENDING_UI_ACTION.store(action, Ordering::Release);
     }
-}
-
-pub fn capture_left_press() {
-    CAPTURED_LEFT_PRESS.store(true, Ordering::Release);
-}
-
-pub fn release_captured_left_press() -> bool {
-    CAPTURED_LEFT_PRESS.swap(false, Ordering::AcqRel)
 }
 
 /// Apply UI intent only on the window's Game instance, never on the server tick.
@@ -305,7 +298,6 @@ pub fn process_pending_ui_action(game: &mut crate::game::Game<'_>) {
         }
         ACTION_CLOSE => {
             game.native_mod_screen_close(ID);
-            CAPTURED_LEFT_PRESS.store(false, Ordering::Release);
         }
         _ => {}
     }
@@ -336,19 +328,22 @@ pub fn draw_screen(
     let selected = selected_tool(|key| game.native_setting(ID, key));
     for (index, rect) in layout.tools.iter().enumerate() {
         let active = index == selected;
+        let unavailable = index == 1;
         game.native_fill(
             batch,
             *rect,
-            if active { 0xFF245B43 } else { 0xFF26394C },
+            if unavailable { 0xFF202830 } else if active { 0xFF245B43 } else { 0xFF26394C },
         );
-        let label = if active {
+        let label = if unavailable {
+            "Wall (soon)".to_owned()
+        } else if active {
             format!("[x] {}", TOOLS[index])
         } else {
             format!("[ ] {}", TOOLS[index])
         };
         let tx = rect[0] + (rect[2] - game.native_text_width(&label)) * 0.5;
         let ty = rect[1] + (rect[3] - 9.0) * 0.5;
-        game.native_text(batch, &label, [tx, ty], 0xFFFFFF, true);
+        game.native_text(batch, &label, [tx, ty], if unavailable { 0x8793A0 } else { 0xFFFFFF }, true);
     }
 
     game.native_fill(batch, layout.preflight, 0xFF245B43);
@@ -382,13 +377,14 @@ mod tests {
     fn settings_have_four_tools_and_builder_button() {
         let labels = setting_labels(2);
         assert_eq!(labels.len(), 5);
-        assert_eq!(&labels[..4], ["[ ] Floor", "[ ] Wall", "[x] Pillar", "[ ] Cube"]);
+        assert_eq!(&labels[..4], ["[ ] Floor", "[—] Wall (unavailable)", "[x] Pillar", "[ ] Cube"]);
         assert_eq!(labels[4], "Open Builder");
     }
 
     #[test]
     fn settings_clamp_invalid_selection() {
         assert_eq!(setting_labels(99)[3], "[x] Cube");
+        assert_eq!(selected_tool(|_| Some("1".to_owned())), 0);
     }
 
     #[test]
@@ -407,6 +403,7 @@ mod tests {
     fn ui_hit_testing_returns_tool_and_close_actions() {
         let layout = ui_layout([0.0, 0.0, 854.0, 480.0]);
         let center = |r: [f32; 4]| [r[0] + r[2] * 0.5, r[1] + r[3] * 0.5];
+        assert_eq!(ui_action_at(&layout, center(layout.tools[1])), None);
         assert_eq!(ui_action_at(&layout, center(layout.tools[2])), Some(2));
         assert_eq!(ui_action_at(&layout, center(layout.close)), Some(ACTION_CLOSE));
         assert_eq!(ui_action_at(&layout, [0.0, 0.0]), None);
