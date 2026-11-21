@@ -8,7 +8,7 @@ fn effortless_building_settings_click(
         return;
     }
 
-    if button < m::TOOLS.len() {
+    if button < m::TOOLS.len() && button != 1 {
         game.native_set_setting(m::ID, "tool", &button.to_string());
     } else if button == m::TOOLS.len() {
         let _ = game.native_mod_screen_open(m::ID);
