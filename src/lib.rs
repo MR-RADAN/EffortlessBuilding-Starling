@@ -1311,7 +1311,7 @@ pub fn preflight_targets(
     facts: &[WorldPreflightInput],
     cap: usize,
 ) -> Result<Vec<PreflightBlock>, PreflightError> {
-    if targets.len() > cap {
+    if targets.len() > cap.min(8_192) {
         return Err(PreflightError::TooManyTargets);
     }
     if targets.len() != facts.len() {
