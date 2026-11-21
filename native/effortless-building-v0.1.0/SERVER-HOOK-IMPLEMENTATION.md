@@ -70,6 +70,12 @@ must not be claimed as preserved unless separately proven. Survival inventory
 consumption and unlimited-block mode remain disabled until a verified item
 accounting path is implemented.
 
+## Held-item resolver investigation
+
+The held inventory entry used by the existing use_item hook is an engine ItemStack; its item field is the canonical namespaced item identifier (string-like), as confirmed by Starling's held-item probe and Wrench hook. The native registry helper Game::item_block does not accept that identifier: it accepts an opaque ItemKey, then resolves its registered identifier via mod_api::__private::item_key_id. The vocabulary crate's exposed token constructor constructs an ItemKey from a numeric registration slot, not from an item identifier. No verified string-to-ItemKey conversion was found in the pinned revision.
+
+Therefore the next safe adapter must resolve the held identifier through the engine behaviour table's item-to-block binding (the same binding item_block consumes) or use a supported key lookup. Do not fabricate a numeric token from a registry index: registration slots and runtime item registry order are not proven equivalent. The resolved block identifier can then be converted with Game::block_key, followed by Game::block_state_default. The current build remains read-only until that path and the per-target validation compile against the pinned source.
+
 ## Current implementation state
 
 The current client mixin records two points, exposes four tool selectors, and
