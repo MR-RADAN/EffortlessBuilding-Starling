@@ -37,6 +37,8 @@ selection and render hooks are awaiting native build validation.
   fail closed.
 - Guarded undo/redo planning that rejects stale world state rather than
   overwriting later player edits.
+- Bounded in-memory build history with separate undo/redo stacks; history
+  moves only after the caller confirms the authoritative edit succeeded.
 - Deterministic capped preview sampling.
 - A confirmation session that keeps preview separate from commit intent and
   consumes a confirmation only once.
