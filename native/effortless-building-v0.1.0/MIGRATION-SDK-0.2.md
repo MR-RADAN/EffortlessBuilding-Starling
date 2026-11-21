@@ -46,7 +46,7 @@ The SDK 0.2 project skeleton has now been added. The first CI attempt exposed th
 - `src/modules/` and `src/mixins/` contain source-preserving copies of all 12 legacy Rust files.
 - `src/lib.rs` and the generated `.gitignore` are present.
 
-The legacy `horizon-mixin.toml` and root-level Rust files remain as reference; they have not been deleted. The new manifest and helper paths were fetched back from the branch for a first textual consistency check. No launcher-side `native-build`, package validation, Rust compilation, or in-game test has run yet. The next gate is to run the official launcher's manifest/layout check and then address any compiler diagnostics. No world-write code has been enabled.
+The legacy `horizon-mixin.toml` and root-level Rust files remain as reference; they have not been deleted. GitHub Actions run #59 completed successfully on commit `585151f7cca5354f5c8a62efaa349a2c876a69a3`: it verified the signed SDK pin, validated declared helper-file presence and Rust syntax, ran `cargo horizon-mod check`, built and checked the versioned `.hmod`, and uploaded the package artifact. This workflow does not type-check injected helper code inside the Starling game crate, run the launcher's full native ARM64 build service, or prove in-game behavior. No world-write code has been enabled.
 
 
 ## World-session state retirement
