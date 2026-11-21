@@ -1,6 +1,7 @@
 // In-game point selection for Effortless Building.
-// This hook only records the block the player is already aiming at; it never
-// changes the world. The authoritative world-edit adapter is a separate gate.
+// This module records selected block coordinates and draws a read-only spatial
+// preview. It never reads block states or changes the world; the authoritative
+// world-edit adapter is a separate implementation gate.
 use super::{Game, GuestUse};
 use horizon_client::first_person::Hand;
 
@@ -103,58 +104,60 @@ impl Game<'_> {
         PREVIEW_LINES.with(|buffer| {
             let mut lines = buffer.borrow_mut();
             lines.clear();
-        for (from, to) in EDGES {
-            lines.push(WorldLine::new(
-                world(corners[from]),
-                world(corners[to]),
-                0xFF42D69A,
-                2.0,
-                WorldDepth::Tested,
-            ));
-        }
-
-        // Four evenly spaced samples per non-degenerate axis (at most 64
-        // crosses), including both ends so the whole selected volume is shown.
-        let samples = |lo: i32, hi: i32| -> Vec<i32> {
-            if lo == hi {
-                return vec![lo];
+            for (from, to) in EDGES {
+                lines.push(WorldLine::new(
+                    world(corners[from]),
+                    world(corners[to]),
+                    0xFF42D69A,
+                    2.0,
+                    WorldDepth::Tested,
+                ));
             }
-            (0..4)
-                .map(|i| {
-                    (i64::from(lo)
-                        + (i64::from(hi) - i64::from(lo)) * i64::from(i) / 3) as i32
-                })
-                .collect()
-        };
-        let xs = samples(min[0], max[0]);
-        let ys = samples(min[1], max[1]);
-        let zs = samples(min[2], max[2]);
-        for x in &xs {
-            for y in &ys {
-                for z in &zs {
-                    let center = [f64::from(*x) + 0.5, f64::from(*y) + 0.5, f64::from(*z) + 0.5];
-                    let d = 0.18;
-                    lines.push(WorldLine::new(
-                        [center[0] - d, center[1], center[2]],
-                        [center[0] + d, center[1], center[2]],
-                        0xDFFFFFFF, 1.5, WorldDepth::Tested,
-                    ));
-                    lines.push(WorldLine::new(
-                        [center[0], center[1] - d, center[2]],
-                        [center[0], center[1] + d, center[2]],
-                        0xDFFFFFFF, 1.5, WorldDepth::Tested,
-                    ));
-                    lines.push(WorldLine::new(
-                        [center[0], center[1], center[2] - d],
-                        [center[0], center[1], center[2] + d],
-                        0xDFFFFFFF, 1.5, WorldDepth::Tested,
-                    ));
+
+            // Four evenly spaced samples per non-degenerate axis (at most 64
+            // crosses), including both ends so the whole selected volume is shown.
+            let samples = |lo: i32, hi: i32| -> Vec<i32> {
+                if lo == hi {
+                    return vec![lo];
+                }
+                (0..4)
+                    .map(|i| {
+                        (i64::from(lo)
+                            + (i64::from(hi) - i64::from(lo)) * i64::from(i) / 3) as i32
+                    })
+                    .collect()
+            };
+            let xs = samples(min[0], max[0]);
+            let ys = samples(min[1], max[1]);
+            let zs = samples(min[2], max[2]);
+            for x in &xs {
+                for y in &ys {
+                    for z in &zs {
+                        let center = [f64::from(*x) + 0.5, f64::from(*y) + 0.5, f64::from(*z) + 0.5];
+                        let d = 0.18;
+                        lines.push(WorldLine::new(
+                            [center[0] - d, center[1], center[2]],
+                            [center[0] + d, center[1], center[2]],
+                            0xDFFFFFFF, 1.5, WorldDepth::Tested,
+                        ));
+                        lines.push(WorldLine::new(
+                            [center[0], center[1] - d, center[2]],
+                            [center[0], center[1] + d, center[2]],
+                            0xDFFFFFFF, 1.5, WorldDepth::Tested,
+                        ));
+                        lines.push(WorldLine::new(
+                            [center[0], center[1], center[2] - d],
+                            [center[0], center[1], center[2] + d],
+                            0xDFFFFFFF, 1.5, WorldDepth::Tested,
+                        ));
+                    }
                 }
             }
-        }
-        // WorldGeometry validates the whole batch atomically and enforces its
-        // fixed per-view line capacity. A refusal draws nothing from this batch.
+            // WorldGeometry validates the whole batch atomically and enforces its
+            // fixed per-view line capacity. A refusal draws nothing from this batch.
+
 
             let _ = draw.lines(&lines);
-        });    }
+        });
+    }
 }
