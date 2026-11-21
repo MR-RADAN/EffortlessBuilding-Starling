@@ -141,6 +141,17 @@ pub fn plan_target_positions(
     Ok(targets)
 }
 
+/// Evenly sample a bounded set of indices across a deterministic plan.
+/// Includes both endpoints whenever more than one marker is requested.
+pub fn sampled_plan_indices(len: usize, cap: usize) -> Vec<usize> {
+    let count = len.min(cap);
+    match count {
+        0 => Vec::new(),
+        1 => vec![0],
+        _ => (0..count).map(|i| i * (len - 1) / (count - 1)).collect(),
+    }
+}
+
 pub fn selection_label_for_tool(tool: usize) -> String {
     let mut label = selection_label();
     if let Some(count) = selection_block_count(tool) {
@@ -372,6 +383,19 @@ pub fn draw_screen(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preview_samples_are_bounded_evenly_and_cover_both_ends() {
+        assert_eq!(sampled_plan_indices(0, 64), Vec::<usize>::new());
+        assert_eq!(sampled_plan_indices(3, 64), vec![0, 1, 2]);
+        assert_eq!(sampled_plan_indices(100, 1), vec![0]);
+        let indices = sampled_plan_indices(8_192, 64);
+        assert_eq!(indices.len(), 64);
+        assert_eq!(indices.first(), Some(&0));
+        assert_eq!(indices.last(), Some(&8_191));
+        assert!(indices.windows(2).all(|pair| pair[0] < pair[1]));
+        assert!(indices.windows(2).all(|pair| pair[1] - pair[0] <= 131));
+    }
 
     #[test]
     fn settings_have_four_tools_and_builder_button() {
