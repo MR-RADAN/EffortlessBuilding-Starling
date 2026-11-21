@@ -8,6 +8,8 @@ use std::sync::Mutex;
 pub const ID: &str = "effortless_building";
 pub const NAME: &str = "Effortless Building";
 pub const VERSION: &str = "0.1.0";
+pub const MAX_BUILD_BLOCKS: u128 = 8_192;
+pub const LARGE_BUILD_WARNING: u128 = 4_096;
 pub const DESCRIPTION: &str =
     "Mobile-first building tools: Floor, Wall, Pillar and Cube; select two world points with right-click.";
 
@@ -79,8 +81,10 @@ pub fn selection_block_count(tool: usize) -> Option<u128> {
 pub fn selection_label_for_tool(tool: usize) -> String {
     let mut label = selection_label();
     if let Some(count) = selection_block_count(tool) {
-        if count > 16_384 {
-            label.push_str(&format!(" | {count} target positions (limit 16384)"));
+        if count > MAX_BUILD_BLOCKS {
+            label.push_str(&format!(" | {count} positions (limit {MAX_BUILD_BLOCKS})"));
+        } else if count > LARGE_BUILD_WARNING {
+            label.push_str(&format!(" | {count} positions (large build; keep below {MAX_BUILD_BLOCKS})"));
         } else {
             label.push_str(&format!(" | {count} target positions"));
         }
