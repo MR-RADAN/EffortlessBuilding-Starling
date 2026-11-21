@@ -83,6 +83,13 @@ bindings = [
 ]
 
 [[native.mixin]]
+id = "world_close"
+kind = "HEAD"
+target = "horizon_client::game::Game<'_>::finish_close_world"
+helper = "src/mixins/world_close.rs"
+bindings = [{ name = "_game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
+
+[[native.mixin]]
 id = "tick"
 kind = "HEAD"
 target = "horizon_client::game::starling::native_compat::Game<'_>::native_tick"
