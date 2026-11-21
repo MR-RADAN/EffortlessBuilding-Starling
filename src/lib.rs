@@ -1168,12 +1168,20 @@ impl BuildQueue {
     /// Inspect the next bounded slice without advancing progress.
     /// The adapter must call commit_batch only after every edit in the slice succeeds.
     pub fn next_range(&self, budget: usize) -> std::ops::Range<usize> {
-        self.cursor..self.cursor.saturating_add(budget).min(self.changes.len())
+        let bounded_budget = budget.min(DEFAULT_BLOCKS_PER_TICK);
+        self.cursor..self.cursor.saturating_add(bounded_budget).min(self.changes.len())
     }
 
-    /// Advance only after the authoritative world adapter confirms this exact slice.
+    /// Advance only after the authoritative world adapter confirms this exact,
+    /// non-empty slice. Even a caller requesting a larger budget cannot commit
+    /// more than DEFAULT_BLOCKS_PER_TICK operations in one game tick.
     pub fn commit_batch(&mut self, range: std::ops::Range<usize>) -> bool {
-        if range.start != self.cursor || range.end < range.start || range.end > self.changes.len() {
+        let max_end = self.cursor.saturating_add(DEFAULT_BLOCKS_PER_TICK).min(self.changes.len());
+        if range.start != self.cursor
+            || range.end <= range.start
+            || range.end > max_end
+            || range.end > self.changes.len()
+        {
             return false;
         }
         self.cursor = range.end;
@@ -1213,6 +1221,16 @@ mod build_queue_tests {
         assert!(q.commit_batch(second));
         assert_eq!(q.progress(), (64, 100));
     }
+    #[test]
+    fn caller_cannot_expand_the_per_tick_budget() {
+        let mut q = queue(100);
+        assert_eq!(q.next_range(usize::MAX), 0..32);
+        assert!(!q.commit_batch(0..100));
+        assert_eq!(q.progress(), (0, 100));
+        assert!(!q.commit_batch(0..0));
+        assert_eq!(q.progress(), (0, 100));
+    }
+
     #[test]
     fn queue_clamps_last_batch_and_stops_when_complete() {
         let mut q = queue(70);
