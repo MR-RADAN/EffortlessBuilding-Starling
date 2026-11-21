@@ -128,6 +128,8 @@ impl Game<'_> {
         if self.remote.is_some()
             || self.player.is_none()
             || self.spectator()
+            || !matches!(self.mode, GameMode::Survival | GameMode::Creative)
+            || !self.native_on(eb::ID)
             || (self.lan_acting.is_none() && !self.native_window())
         {
             return Err(NativePreflightError::NotAuthoritativePlayer);
@@ -184,6 +186,8 @@ impl Game<'_> {
         if self.remote.is_some()
             || self.player.is_none()
             || self.spectator()
+            || !matches!(self.mode, GameMode::Survival | GameMode::Creative)
+            || !self.native_on(eb::ID)
             || (self.lan_acting.is_none() && !self.native_window())
             || eb::selection_points() != plan.selection
             || eb::selected_tool(|key| self.native_setting(eb::ID, key)) != plan.tool
