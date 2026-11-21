@@ -194,7 +194,7 @@ pub fn selected_tool(read: impl Fn(&str) -> Option<String>) -> usize {
 
 /// The settings page keeps the four quick selectors and opens the full builder.
 pub fn setting_labels(tool: usize) -> Vec<String> {
-    let selected = tool.min(TOOLS.len() - 1);
+    let selected = if tool < TOOLS.len() && tool != 1 { tool } else { 0 };
     let mut labels: Vec<String> = TOOLS
         .iter()
         .enumerate()
@@ -286,7 +286,7 @@ pub fn process_pending_ui_action(game: &mut crate::game::Game<'_>) {
     }
 
     match PENDING_UI_ACTION.swap(NO_ACTION, Ordering::AcqRel) {
-        action if (0..TOOLS.len() as i32).contains(&action) => {
+        action if (0..TOOLS.len() as i32).contains(&action) && action != 1 => {
             game.native_set_setting(ID, "tool", &action.to_string());
         }
         ACTION_PREFLIGHT => {
