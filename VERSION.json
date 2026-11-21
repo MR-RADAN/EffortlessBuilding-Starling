@@ -8,7 +8,7 @@
   "target": "Starling 0.9.0 / Horizon ARM64",
   "horizon_revision": "ff303502a4f7982551a0e0d3622d9268efe9e829",
   "horizon_mixins_revision": "5a64af938ec86b00d53d16a408aabc0038fb3e57",
-  "status": "Starling 0.9.0 native UI and two-point selection source implemented; pure Rust core tests passing; Android ARM64 native compilation in CI; live preview and world-edit adapter pending",
+  "status": "Starling 0.9.0 native UI, two-point ray-pick selection and read-only spatial preview implemented in source; pure Rust core tests passing; native ARM64 compilation pending",
   "implemented_core": [
     "line",
     "wall",
@@ -25,5 +25,5 @@
     "bounded preview sampling",
     "two-corner selection geometry"
   ],
-  "integration_status": "native bundle manifest, legacy hook declarations, tool-selection screen, click isolation and source-level two-point ray-pick selection are present; live preview markers, authoritative world snapshots/edits, inventory handling and live undo/redo remain unimplemented"
+  "integration_status": "native bundle manifest, tool-selection screen, click isolation, stick-gated point capture and bounded world-space wireframe/sample preview are present in source; per-block ghost states, authoritative snapshots/edits, inventory handling and live undo/redo remain unimplemented"
 }
