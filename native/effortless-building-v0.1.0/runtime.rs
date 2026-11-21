@@ -210,7 +210,7 @@ pub fn draw_screen(
     game.native_fill(batch, [px + pw - 2.0, py, 2.0, ph], 0xFF4B657E);
 
     game.native_text(batch, "Effortless Building", [px + 14.0, py + 14.0], 0xFFFFFF, true);
-    game.native_text(batch, "Choose a construction tool", [px + 14.0, py + 36.0], 0xC8D4E0, false);
+    game.native_text(batch, "Read-only outline and distributed preview markers", [px + 14.0, py + 36.0], 0xC8D4E0, false);
 
     let selected = selected_tool(|key| game.native_setting(ID, key));
     for (index, rect) in layout.tools.iter().enumerate() {
