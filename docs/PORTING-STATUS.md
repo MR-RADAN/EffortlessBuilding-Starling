@@ -1,59 +1,100 @@
-# Porting status — 1.2.0
+# Porting status — project 1.2.0 / native bundle 0.1.0
 
-## Historical 0.8.0 pins
-- Starling: 0.8.0
-- Horizon: ac874422ed8f892505ff73d67ae486ecfee7a516
-- horizon-mixins: ddd9700b21997c95d95ac6ee5ecafe3830cf622a
+## Pinned target
 
-These are historical 0.8.0 pins only. The current target pins are recorded in VERSION.json and the native bundle manifests.
+- Starling 0.9.0 source commit: `ff303502a4f7982551a0e0d3622d9268efe9e829`.
+- `horizon-mixins`: `5a64af938ec86b00d53d16a408aabc0038fb3e57`.
+- Native bundle directory: `native/effortless-building-v0.1.0/`.
+- Native package filename: `effortless_building-0.1.0.hnmod`.
+- Native metadata author/creator: MR.
+
+Historical 0.8.0 build and pin information is retained in
+`docs/NATIVE-ANDROID-BUILD.md`; it is not the current target.
 
 ## Implemented source core
-- Deterministic geometry: line, wall, floor, cuboid, circle, cylinder, sphere, pyramid, cone and dome.
-- Bounded block counts and coordinate conversion.
+
+- Deterministic geometry: line, wall, floor, cuboid, circle, cylinder, sphere,
+  pyramid, cone and dome.
+- Bounded block counts and checked coordinate conversion.
 - Reverse transaction planning with repeated-position coalescing.
 - Chunk-aware batch grouping, including negative coordinates.
-- Deterministic capped preview sampling.
-- Checked dimension multiplication for cuboids, floors and walls; wall Y-coordinate overflow is rejected before generation.
-- Regression tests added for extreme coordinate ranges and wall-height overflow (not executed in this environment).
+- Deterministic capped preview sampling (preview samples are not placement lists).
+- Snapshot-gated transaction preparation: a build cannot be planned unless
+  every target position has a before-state snapshot.
+- Undo/redo preflight helper rejects the entire transaction if any current
+  block differs from the expected state.
+- Regression tests cover missing snapshots, duplicate positions, no-op
+  filtering, and intervening edits.
 
-## Current Starling 0.9.0 target pins
-- Horizon/Starling source: ff303502a4f7982551a0e0d3622d9268efe9e829.
-- Global horizon-mixins: 5a64af938ec86b00d53d16a408aabc0038fb3e57.
-- VERSION.json, horizon-native.json and horizon-mixin.toml have been updated consistently.
-- Legacy .hnmod import requires strict horizon-native.json fields including both exact horizon and mixins revisions; identity and horizon revision must match horizon-mixin.toml.
+## Native UI scaffold
 
-## Confirmed Starling 0.9.0 source facts
-- Official tag: v0.9.0.
-- Source commit: ff303502a4f7982551a0e0d3622d9268efe9e829.
-- The .hnmod native bundle route remains supported; it was not replaced by the old Starling-specific/WASM format.
-- Top-level native bundle metadata is horizon-native.json; the official Wrench example uses game, id, mixins, schema, and version.
-- The v0.9.0 native build script pins horizon-mixins to 5a64af938ec86b00d53d16a408aabc0038fb3e57.
-- Starling includes native_mod_adapt.py to adapt legacy hook targets and the old Starling mod API to the reorganized Horizon source tree.
-- The native build path sends native bundle source to a build service, checks the returned library's SHA-256, and only loads it for the APK install it was built against.
-- The v0.9.0 in-repository native-mods.yml workflow builds reviewed bundles already in Starling's own native-mods/ tree; it is not a generic project upload/build route.
-- The public starling-client/mod-builds/versions.json checked on 2026-11-21 still maps only 0.8.0. This does not establish the active configuration of Starling's separately published HTTPS gateway.
+- Native bundle manifest and strict `.hnmod` package layout are present.
+- Settings list, dedicated builder panel, tool selection and close action are
+  wired through the native hook manifest.
+- Touch press/release inside the panel is captured to prevent the same click
+  reaching the world.
+- The UI is still a tool-selection shell. It does not yet select world
+  coordinates, draw spatial preview markers, or change blocks.
 
-See the corrected compatibility audit in STARLING-0.9.0-COMPATIBILITY-AUDIT.md.
+## Starling 0.9.0 source audit
 
-## Not implemented or verified
-- No Horizon hooks are connected.
-- No native screen or Android touch-input isolation exists yet.
-- No world read/write adapter exists.
-- No inventory consumption or Unlimited Blocks implementation exists.
-- No server-authority or multiplayer behavior has been tested.
-- A source bundle scaffold and deterministic .hnmod packager exist, but the updated v0.9.0 package has not been produced or imported.
-- Rust tests and Cargo checks have not run here because Rust/Cargo are unavailable. The latest overflow-regression tests are committed but remain unexecuted.
-- The v0.9.0 native bundle importer/build-service route for this project's own bundle has not yet been exercised. The default gateway URL is published in Starling source, but its server-side version registry is not public; the public GitHub-runner map still lists only 0.8.0.
+Verified directly against the pinned source:
 
-## Adapter safety requirements
-1. Preview must be read-only.
-2. Bulk placement requires explicit confirmation.
-3. Snapshot original states before mutation; abort if the snapshot is incomplete.
-4. Bound operation size and undo memory; do not load chunks just to place blocks.
-5. Verify current state before undo/redo to avoid overwriting later edits.
-6. Inventory changes must use the authoritative game/server path.
-7. Unlimited Blocks is only valid where the authoritative server accepts edits; it is not a client-side multiplayer bypass.
-8. The native screen runs over the world and does not pause singleplayer. Touch isolation must not modify Starling, MCPE or GoyControl touch layouts.
+- Legacy `.hnmod` import remains supported; `horizon-native.json` is required
+  at the archive root and source files live under `mixins/<id>/`.
+- The importer requires exact matching id/version/Horizon revision in the
+  JSON and mixin TOML, plus exact pinned Horizon and mixins commit hashes.
+- The legacy native adapter remaps old hook targets and source calls for the
+  reorganized Horizon tree.
+- The native UI's seven hook injections and one module were transformed
+  successfully by `native_mod_adapt.py` in the first 0.9.0 build attempt.
+- Starling 0.9.0 provides an authoritative server-side typed bulk edit path
+  (`edit_blocks`), bounded column snapshot reads (`read_columns`), and
+  loaded-column height queries. These operate only on the level being ticked;
+  remote client edits are refused.
+- Column reads are limited to 1,048,576 block positions per call and do not
+  load missing chunks. Bulk edits can skip unloaded chunks and do not preserve
+  arbitrary block-entity NBT.
+- The exact API constraints and transaction safeguards are documented in
+  `docs/WORLD-EDIT-ADAPTER-CONTRACT.md`.
 
-## Next gate
-Inspect the v0.9.0 Wrench example, the adapted hook catalog, and the game's authoritative block placement/destruction/inventory implementation. Then build the smallest safe native bundle skeleton against the exact v0.9.0 pins. Do not invent API names or claim runtime behavior before compilation and in-game tests.
+## Build validation
+
+- Rust core tests previously passed in GitHub Actions run
+  [44874732757](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44874732757)
+  for the earlier core revision. The newly added snapshot transaction tests
+  still require a fresh CI result.
+- Source package validation passed in run
+  [44875262029](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44875262029).
+  This validates ZIP structure only, not importer acceptance or compilation.
+- The first Starling 0.9.0 Android build attempt,
+  [44875302971](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44875302971),
+  failed before Cargo compilation because `rust-src` was missing. The
+  transformation phase itself completed with seven injections and one module.
+  The Android workflow now installs `rust-src` before invoking the native
+  build. A subsequent run must confirm the correction and reveal any actual
+  Rust compile errors.
+
+## Not yet implemented or verified
+
+- No live world read/write adapter is connected to the UI.
+- No coordinate selection or world-space preview is implemented.
+- No block placement, wall/floor/cuboid commit, or shape commit is available.
+- No live undo/redo is connected to snapshots.
+- No inventory consumption or Unlimited Blocks implementation is available.
+- No runtime test on Starling 0.9.0 or POCO F5 has been completed.
+- No installable APK has been produced. The expected native build output is a
+  Starling ARM64 library, not a standalone APK.
+
+## Safety gates
+
+1. Preview remains read-only.
+2. Explicit confirmation is required before bulk mutation.
+3. Every affected position must be snapshotted; incomplete snapshots abort.
+4. No implicit chunk loading.
+5. Undo/redo must validate every current state before applying any inverse.
+6. No block-entity/NBT preservation promise until proven.
+7. Inventory changes and Unlimited Blocks require verified authoritative
+   server-side behavior; no multiplayer client bypass.
+8. The custom screen must not interfere with Starling, MCPE or GoyControl
+   touch layouts.
