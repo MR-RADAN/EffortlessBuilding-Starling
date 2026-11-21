@@ -1,105 +1,80 @@
-# Server-side world-edit adapter — Starling 0.9.0
+# World-edit adapter — Starling 0.9.0
 
 Creator: MR  
 Mod version: 0.1.0  
 Target revision: `ff303502a4f7982551a0e0d3622d9268efe9e829`
 
-## Supported entry point
+## Verified integration route
 
-The authoritative edit adapter belongs in the actual mod crate's root hook
-implementation, not in a client `Game<'_>` mixin:
+This project is packaged as a legacy `.hnmod` `horizon-mixins` bundle. It
+must not pretend that `Hooks::server_tick(&mut dyn ServerHost)` is available
+inside a client `Game<'_>` injection. That is a separate Horizon code-mod API.
 
-```rust,ignore
-use mod_api::{self, Hooks, ServerHost};
+For this package format, the verified Starling 0.9.0 reference is the built-in
+Wrench native mod at `native-mods/wrench/mixins/wrench/native.rs`. It handles
+a player's action in `Game::use_item`, rejects remote clients, and accesses
+the acting local single-player/LAN-host world through the same `Game`
+instance. It reads `self.world`, checks `self.world.loaded(...)`, and invokes
+block behaviour through `self.with_level(|behaviours, level, ticks| ...)`.
+The Wrench implementation uses `Behaviours::set_block` /
+`destroy_block` with `horizon_world::level::flags::UPDATE_ALL`.
 
-#[derive(Default)]
-struct EffortlessBuilding;
+This is the implementation route for Effortless Building 0.1.0. Do not add
+invented `ServerHost` parameters or a second crate that the current importer
+does not load.
 
-#[mod_api::horizon_mod]
-impl Hooks for EffortlessBuilding {
-    fn server_tick(
-        &self,
-        host: &mut dyn ServerHost,
-        event: &mut mod_api::ServerTickEvent,
-    ) {
-        // Process only a bounded, explicitly confirmed server-side request.
-    }
-}
-```
+## Authority and scope
 
-The pinned hook catalog declares `fn server_tick()` as a server-side listen
-hook. The generated API dispatches it in two phases: `ServerTickStart` before
-any level ticks and `ServerTickEnd` after the last level tick. A paused pass
-fires no event; a frozen world reports `world_running == false` except during
-a requested step. `host.server_has_time()` reports whether optional work still
-fits before the next tick. Do not assume the current world/level is the target
-dimension: the API documentation explicitly says which level the server host
-holds is not defined. The server hook is the authority boundary; the existing
-client mixin remains responsible only for selection input, UI and drawing.
+- Only the local single-player game or the acting LAN host may mutate.
+- Reject `self.remote.is_some()`, missing player, spectator, and non-acting
+  server/window contexts, following Wrench's guards.
+- A LAN guest may request an action only through the normal acting-player
+  path; never mutate the guest's local client copy of a remote server world.
+- Resolve and validate the entire target set before the first write.
+- Enforce the hard cap of 16,384 unique target positions.
+- Reject out-of-height, unloaded, out-of-border, and otherwise invalid targets.
+- Require a distinct explicit confirmation action after selection/preview.
+- Keep the selection tool and preview read-only; no block changes on point
+  selection, menu opening, tool selection, or preview rendering.
 
-## Public host calls
+## Transaction design
 
-The pinned `ServerHost` world-edit surface declares:
+The Wrench API demonstrates a block-behaviour write path, not a bulk atomic
+transaction. Starling 0.9.0's public mixin route does not expose the
+`ServerHost` snapshot/edit contract described by the separate mod API.
 
-- `surface_heights(dimension, columns, heightmap)`
-- `read_columns(dimension, columns, heightmap, range)`
-- `edit_blocks(dimension, edit)`
+Before enabling bulk placement, the adapter must:
 
-Limits are 65,536 columns for a height query and 1,048,576 block positions
-per column read. Unloaded columns produce `None` in the height preflight,
-but read results represent unloaded columns as air. Every target column must
-therefore pass the height preflight before a snapshot is accepted.
+1. Freeze an immutable list of unique target coordinates and the intended
+   complete `BlockState`; reject empty/oversized selections.
+2. Verify every target is inside the world's Y layout, loaded, and within the
+   world border. Do not implicitly load chunks.
+3. Snapshot each current `BlockStateId` and resolve it through the block
+   registry. Abort if any state cannot be resolved.
+4. Validate the replacement state and all target-specific survival/shape
+   constraints before mutation where the behaviour API permits.
+5. Apply through `with_level` and `Behaviours::set_block` using the engine's
+   update flags. Count actual successful writes; never report the requested
+   count as the committed count.
+6. If a write fails after earlier writes succeeded, attempt a guarded
+   best-effort restoration only where the current state still equals the
+   state written by this operation. Report partial failure explicitly; do not
+   claim atomicity or guaranteed rollback.
+7. Record undo data only for positions whose writes actually succeeded.
+   Undo/redo must re-check each current state against the transaction's
+   expected state before attempting a guarded change.
 
-`edit_blocks` takes a `mod_api::BlockEdit`, whose palette contains complete
-block states and whose runs refer to palette entries and optional filters.
-It may omit runs in unloaded chunks or outside the column. The adapter must
-preflight the exact target bounds and treat a returned count different from
-the intended count as a failed/incomplete commit; it must not record history
-for that operation.
-
-## Required request lifecycle
-
-1. Client input creates a selection request only. It cannot call world writes.
-2. Server hook validates the request identity, dimension, world/session epoch,
-   operation cap (16,384), and explicit confirmation token.
-3. Resolve unique target columns; preflight all of them with
-   `surface_heights`. Abort on any unloaded column.
-4. Read the full exact target Y span in bounded calls. Decode the column-major,
-   bottom-first palette indices while preserving complete palette states.
-5. Construct `BlockEdit` runs and per-position expected-state predicates from
-   that fresh snapshot. Validate palette/filter indexes before the write.
-6. Call `edit_blocks` once for the confirmed request. Only a complete
-   expected change count may be recorded in history.
-7. Undo/redo repeat the preflight and fresh snapshot, and refuse if any current
-   state differs from the expected state recorded by the transaction.
-
-## Important limitation
-
-The API offers separate read and edit calls, not a multi-call world lock or
-rollback transaction. This is optimistic conflict checking; an external world
-change may occur between snapshot and edit. Never describe it as strict
-atomicity, and never claim rollback after an uncertain/partial engine result.
+The engine API may trigger neighbour updates and block behaviour side effects.
+A block entity's NBT, inventories, scheduled ticks, and arbitrary side effects
+must not be claimed as preserved unless separately proven. Survival inventory
+consumption and unlimited-block mode remain disabled until a verified item
+accounting path is implemented.
 
 ## Current implementation state
 
-The client-side mixin bundle does not yet contain this server hook crate or
-connect it to the shared selection/request state. No live block mutation,
-inventory consumption, unlimited-block mode, or live undo/redo is enabled.
-This document records the verified integration boundary; it is not a claim
-that the adapter has been implemented or tested in-game.
-
-
-## Critical packaging distinction
-
-The currently installed `.hnmod` is a legacy `horizon-mixins` bundle. Its
-`Game<'_>` injections do not receive `&mut dyn ServerHost`; adding a method
-with a ServerHost-like signature inside `native.rs` cannot make that API
-available. The `ServerHost` route above describes a separate Horizon code-mod
-crate using `horizon-mod-api`, not a callable helper in this mixin bundle.
-
-Starling's Wrench native mod demonstrates the alternative supported path for
-the current bundle: mutate only the acting single-player/LAN server's
-`Game` world through its existing `with_level` / level block APIs, and refuse
-remote clients. This is likely the smaller integration path for this project,
-but it still needs a carefully preflighted transaction adapter and verified
-rollback/partial-failure handling before it can be enabled.
+The current client mixin records two points, exposes four tool selectors, and
+draws a bounded read-only wireframe/sample preview. It does not yet perform
+bulk world edits, and the UI does not yet contain the required confirmation
+and material-selection flow. The ARM64 native build compiles the mixin bundle
+into Starling's Android library; a successful compile alone is not proof of
+in-game functionality. Device testing on Starling 0.9.0 is still required.
