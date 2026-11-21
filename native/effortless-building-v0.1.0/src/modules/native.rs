@@ -3,6 +3,7 @@
 // preview. It never reads block states or changes the world; the authoritative
 // world-edit adapter is a separate implementation gate.
 use super::{Game, GuestUse};
+use horizon_client::command::args::GameMode;
 use horizon_client::first_person::Hand;
 use horizon_client::text::Text;
 use horizon_protocol::packets::play::{self, Clientbound as C};
@@ -64,6 +65,7 @@ impl Game<'_> {
         if self.remote.is_some()
             || self.player.is_none()
             || self.spectator()
+            || !matches!(self.mode, GameMode::Survival | GameMode::Creative)
             || !self.native_on(eb::ID)
         {
             return None;
