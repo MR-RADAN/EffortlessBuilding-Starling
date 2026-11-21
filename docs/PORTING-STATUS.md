@@ -50,8 +50,10 @@ Historical 0.8.0 build and pin information is retained in
   16,384-position core limit before any commit can be offered.
 - The preview represents the selected region, not individual ghost block
   states. It does not read block snapshots or modify the world.
-- Point capture and preview remain source-only until the next native Android
-  build validates the new `use_item` and `submit_custom_geometry` hooks.
+- The 0.9.0 adapter has rewritten all nine hook targets, including `use_item`
+  and `submit_custom_geometry`; the first compile attempt then caught a duplicate
+  module/injection ID before Rust compilation. The injection ID is now
+  `world_preview`; the corrected native build is running.
 
 ## Starling 0.9.0 source audit
 
@@ -63,8 +65,12 @@ Verified directly against the pinned source:
   JSON and mixin TOML, plus exact pinned Horizon and mixins commit hashes.
 - The legacy native adapter remaps old hook targets and source calls for the
   reorganized Horizon tree.
-- The native UI's seven hook injections and one module were transformed
-  successfully by `native_mod_adapt.py` in the first 0.9.0 build attempt.
+- The first 0.9.0 attempt transformed seven UI injections and one module.
+- The later preview-enabled attempt transformed all nine hooks (the new
+  `use_item` and `submit_custom_geometry` targets were mapped to their exact
+  0.9.0 source locations) and brought all three project modules up to date.
+  It then stopped at manifest validation because module and injection IDs
+  collided; the injection has since been renamed.
 - Starling 0.9.0 provides an authoritative server-side typed bulk edit path
   (`edit_blocks`), bounded column snapshot reads (`read_columns`), and
   loaded-column height queries. These operate only on the level being ticked;
@@ -84,13 +90,15 @@ Verified directly against the pinned source:
 - Source package validation passed in run
   [44875262029](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44875262029).
   This validates ZIP structure only, not importer acceptance or compilation.
-- The first Starling 0.9.0 Android build attempt,
+- The first Starling 0.9.0 build,
   [44875302971](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44875302971),
-  failed before Cargo compilation because `rust-src` was missing. The
-  transformation phase itself completed with seven injections and one module.
-  The Android workflow now installs `rust-src` before invoking the native
-  build. A subsequent run must confirm the correction and reveal any actual
-  Rust compile errors.
+  exposed the missing `rust-src` toolchain component; the workflow now installs it.
+- Build [44876927294](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44876927294)
+  reached manifest validation after adapting all nine hook targets, but failed
+  with `E_DUPLICATE_ID` because the module and injection both used `preview`.
+- The injection ID was changed to `world_preview`. Corrected build
+  [44877289336](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44877289336)
+  is now validating the full native bundle against the exact 0.9.0 source.
 
 ## Not yet implemented or verified
 
