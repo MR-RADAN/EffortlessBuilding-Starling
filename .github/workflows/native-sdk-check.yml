@@ -1,0 +1,41 @@
+name: Validate native mod against Starling 0.9.0 SDK
+
+on:
+  pull_request:
+    paths:
+      - "native/effortless-building-v0.1.0/**"
+      - ".github/workflows/native-sdk-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-sdk-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out mod source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check out the exact Starling 0.9.0 source
+        uses: actions/checkout@v4
+        with:
+          repository: starling-client/starling
+          ref: ff303502a4f7982551a0e0d3622d9268efe9e829
+          path: starling-source
+          persist-credentials: false
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install pinned cargo-horizon-mod CLI
+        run: cargo install --path starling-source/crates/cargo-horizon-mod --locked
+
+      - name: Validate the native mod package, SDK and Rust source
+        working-directory: native/effortless-building-v0.1.0
+        run: cargo horizon-mod check
