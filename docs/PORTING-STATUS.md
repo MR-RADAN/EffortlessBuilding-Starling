@@ -19,6 +19,8 @@ Historical 0.8.0 build and pin information is retained in
 - Reverse transaction planning with repeated-position coalescing.
 - Chunk-aware batch grouping, including negative coordinates.
 - Deterministic capped preview sampling (preview samples are not placement lists).
+- Two-corner geometry mapping for Floor, Wall, Pillar and Cube, including
+  lower-Y floor placement, inclusive wall/pillar height and full cuboid bounds.
 - Snapshot-gated transaction preparation: a build cannot be planned unless
   every target position has a before-state snapshot.
 - Undo/redo preflight helper rejects the entire transaction if any current
