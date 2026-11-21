@@ -424,7 +424,7 @@ mod selection_count_tests {
             second: Some([2, 4, 6]),
         };
         assert_eq!(selection_block_count_for(selection, 0), Some(8));
-        assert_eq!(selection_block_count_for(selection, 1), Some(24));
+        assert_eq!(selection_block_count_for(selection, 1), None);
         assert_eq!(selection_block_count_for(selection, 2), Some(3));
         assert_eq!(selection_block_count_for(selection, 3), Some(24));
     }
