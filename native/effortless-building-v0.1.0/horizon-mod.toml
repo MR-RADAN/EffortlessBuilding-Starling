@@ -5,7 +5,7 @@ description = "Mobile-first building tools with bounded, read-only preview and p
 authors = ["MR"]
 api = "0.2"
 side = "both"
-capabilities = []
+capabilities = ["registries"]
 
 [native]
 game = "26.3"
