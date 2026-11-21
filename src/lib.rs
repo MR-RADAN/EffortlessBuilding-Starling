@@ -1103,3 +1103,92 @@ mod build_history_tests {
         );
     }
 }
+
+// Per-tick work scheduler for the native world-edit adapter.
+// The adapter must call this from the authoritative game tick and apply only
+// the returned slice on that tick. The fixed budget bounds frame-time spikes
+// on mobile; no worker thread or background polling is required.
+pub const DEFAULT_BLOCKS_PER_TICK: usize = 32;
+
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
+pub struct BuildQueue {
+    changes: Vec<BlockChange>,
+    cursor: usize,
+}
+
+impl BuildQueue {
+    pub fn new(changes: Vec<BlockChange>, cap: usize) -> Result<Self, GeometryError> {
+        if changes.len() > cap { return Err(GeometryError::TooManyBlocks); }
+        let mut seen = BTreeSet::new();
+        if changes.iter().any(|change| !seen.insert(change.pos)) {
+            return Err(GeometryError::InvalidBatchSize);
+        }
+        Ok(Self { changes, cursor: 0 })
+    }
+
+    /// Reserve the next bounded slice. The range indexes changes().
+    pub fn reserve_next(&mut self, budget: usize) -> std::ops::Range<usize> {
+        let start = self.cursor;
+        self.cursor = self.cursor.saturating_add(budget).min(self.changes.len());
+        start..self.cursor
+    }
+
+    pub fn changes(&self) -> &[BlockChange] { &self.changes }
+    pub fn progress(&self) -> (usize, usize) { (self.cursor, self.changes.len()) }
+    pub fn is_complete(&self) -> bool { self.cursor >= self.changes.len() }
+
+    /// Cancellation releases the queued transaction immediately.
+    pub fn cancel(&mut self) {
+        self.changes.clear();
+        self.changes.shrink_to_fit();
+        self.cursor = 0;
+    }
+}
+
+#[cfg(test)]
+mod build_queue_tests {
+    use super::*;
+    fn queue(count: usize) -> BuildQueue {
+        let changes = (0..count).map(|x| BlockChange {
+            pos: BlockPos::new(x as i32, 0, 0), before_state: 0, after_state: 1,
+        }).collect();
+        BuildQueue::new(changes, 8_192).unwrap()
+    }
+    #[test]
+    fn queue_never_reserves_more_than_the_per_tick_budget() {
+        let mut q = queue(100);
+        assert_eq!(q.reserve_next(DEFAULT_BLOCKS_PER_TICK), 0..32);
+        assert_eq!(q.reserve_next(DEFAULT_BLOCKS_PER_TICK), 32..64);
+        assert_eq!(q.progress(), (64, 100));
+    }
+    #[test]
+    fn queue_clamps_last_batch_and_stops_when_complete() {
+        let mut q = queue(70);
+        assert_eq!(q.reserve_next(32), 0..32);
+        assert_eq!(q.reserve_next(32), 32..64);
+        assert_eq!(q.reserve_next(32), 64..70);
+        assert!(q.is_complete());
+        assert_eq!(q.reserve_next(32), 70..70);
+    }
+    #[test]
+    fn zero_budget_does_not_advance_and_cancel_releases_work() {
+        let mut q = queue(10);
+        assert_eq!(q.reserve_next(0), 0..0);
+        q.cancel();
+        assert_eq!(q.progress(), (0, 0));
+        assert!(q.is_complete());
+        assert!(q.changes().is_empty());
+    }
+    #[test]
+    fn queue_rejects_oversized_or_duplicate_transactions() {
+        let oversized = (0..2).map(|x| BlockChange {
+            pos: BlockPos::new(x, 0, 0), before_state: 0, after_state: 1,
+        }).collect();
+        assert_eq!(BuildQueue::new(oversized, 1), Err(GeometryError::TooManyBlocks));
+        let duplicate = vec![
+            BlockChange { pos: BlockPos::new(1, 0, 0), before_state: 0, after_state: 1 },
+            BlockChange { pos: BlockPos::new(1, 0, 0), before_state: 0, after_state: 2 },
+        ];
+        assert_eq!(BuildQueue::new(duplicate, 8), Err(GeometryError::InvalidBatchSize));
+    }
+}
