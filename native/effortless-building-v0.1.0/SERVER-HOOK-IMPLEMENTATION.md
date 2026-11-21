@@ -260,3 +260,29 @@ finalized. Floor, Pillar, and Cube remain preview-only.
 The preview remains read-only. It does not validate world state, choose a
 material, ask for confirmation, or write blocks. No compile or device test
 was run for these changes.
+
+
+## Native read-only world preflight adapter
+
+A native adapter has now been added to `native.rs` using the exact Wrench
+access pattern at the pinned Horizon revision. It accepts a frozen target
+slice and, in one non-yielding read-only pass:
+
+- rejects remote clients, missing players, spectators, and non-acting contexts;
+- enforces non-empty input and the 8,192 hard cap;
+- checks Y bounds, already-loaded chunks, world border, and eye-to-block reach;
+- reads each current `BlockStateId` and verifies that the pinned block registry
+  resolves it;
+- returns typed `NativePreflightBlock` snapshots only after every target passes.
+
+The adapter does not request chunk loads, yield between checks, consume
+inventory, or write blocks. Its snapshots are intentionally native-layer
+records containing the engine's `BlockStateId`; they are not yet converted
+into the separate pure-core `WorldPreflightInput` representation, and the
+adapter is not yet called by a confirmation/placement flow. Duplicate-target
+validation remains the responsibility of the frozen planner/core gate.
+
+This is still a source-level implementation only. No compile or device test
+was run, so Rust visibility/type compatibility must be confirmed by the
+project's native build before this adapter is relied upon. No placement or
+world-write hook was added.
