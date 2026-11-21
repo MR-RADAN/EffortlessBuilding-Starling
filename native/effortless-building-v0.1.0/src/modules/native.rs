@@ -56,7 +56,8 @@ pub(super) enum NativePreflightError {
     UnloadedChunk { index: usize },
     OutsideBorder { index: usize },
     NoSelectionCornerInReach,
-    MissingOffhandBlock,
+    MissingOffhandStack,
+    UnsupportedOffhandBlockItem,
     UnresolvedState { index: usize },
 }
 
@@ -153,11 +154,11 @@ impl Game<'_> {
         // than guessed (some item/block mappings are intentionally non-1:1).
         let target_item = self.offhand.as_ref()
             .filter(|stack| stack.count > 0)
-            .ok_or(NativePreflightError::MissingOffhandBlock)?;
+            .ok_or(NativePreflightError::MissingOffhandStack)?;
         let target_state = self.pack.assets.registry
             .default_state(target_item.item.as_ref())
             .filter(|state| self.pack.assets.registry.state(*state).is_some())
-            .ok_or(NativePreflightError::MissingOffhandBlock)?;
+            .ok_or(NativePreflightError::UnsupportedOffhandBlockItem)?;
 
         let layout = self.world.layout();
         let reach = self.reach() + 1.0;
