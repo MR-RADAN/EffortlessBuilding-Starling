@@ -7,10 +7,26 @@ priority = 100
 horizon_revision = "ff303502a4f7982551a0e0d3622d9268efe9e829"
 
 [[module]]
+id = "native"
+file = "crates/horizon-client/src/game.rs"
+name = "effortless_building_native"
+source = "native.rs"
+
+[[module]]
 id = "runtime"
 file = "crates/horizon-client/src/game.rs"
 name = "effortless_building"
 source = "runtime.rs"
+
+[[injection]]
+id = "use"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::Game<'_>::use_item"
+helper = "use.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
 
 [[injection]]
 id = "list"
