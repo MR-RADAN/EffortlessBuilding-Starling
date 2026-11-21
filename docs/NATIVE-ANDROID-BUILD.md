@@ -37,7 +37,7 @@ spatial preview, read block snapshots, place blocks, or implement undo/redo.
 No block-edit API is called, so this milestone cannot alter the world.
 
 
-## Starling 0.9.0 validation — in progress
+## Starling 0.9.0 validation — build toolchain correction in progress
 
 The project target pins and native package manifests have been updated to:
 - Starling/Horizon source: `ff303502a4f7982551a0e0d3622d9268efe9e829`
@@ -45,8 +45,10 @@ The project target pins and native package manifests have been updated to:
 
 The GitHub Actions workflow now checks out the exact `v0.9.0` tag and verifies that commit before invoking Starling's own `native_build.sh`.
 
-- 0.9.0 build run: [44875302971](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44875302971) — queued at the time of this update.
+- 0.9.0 build run: [44875302971](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44875302971) — failed before Rust compilation because the installed toolchain lacked the `rust-src` component required by Starling's Android standard-library build. The mixin transformation itself completed successfully: 7 injections and 1 module were applied. The workflow now explicitly installs `rust-src`; a new run is expected from the subsequent workflow-path commit.
 - Source package workflow: [44875262029](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44875262029) — completed successfully for the updated native manifest and source package.
 
-A successful package ZIP workflow only proves archive generation and its local structural checks. It does not prove that Starling's 0.9.0 importer accepts it or that the native bundle compiles. The 0.9.0 Android build run must finish successfully before claiming source compatibility.
+A successful package ZIP workflow only proves archive generation and its local structural checks. It does not prove that Starling's 0.9.0 importer accepts it or that the native bundle compiles. The retry must finish successfully before claiming source compatibility.
+
+The 0.9.0 source audit also confirmed the supported server-side edit path and column snapshot API. The world-edit adapter contract was rewritten against those exact 0.9.0 sources; it no longer describes the obsolete 0.8.0 helper names or run layout. The actual mod adapter remains unimplemented.
 
