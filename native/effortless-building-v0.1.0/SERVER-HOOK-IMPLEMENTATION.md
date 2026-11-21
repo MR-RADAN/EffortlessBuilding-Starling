@@ -215,3 +215,28 @@ until the plane orientation is specified consistently in planner, count,
 and preview.
 
 No source compilation or device test was run in this update.
+
+
+## Pure fail-closed preflight core added
+
+The pure Rust core now defines `WorldPreflightInput`, `PreflightBlock`,
+`PreflightError`, and `preflight_targets(...)`.
+
+The helper accepts the frozen ordered target list plus one adapter-collected
+fact record per target. It rejects count/order mismatches, duplicate targets,
+out-of-height positions, unloaded chunks, positions outside the world border,
+out-of-reach targets, and unresolved before-states. It returns compact
+before-state records only if every target passes. It also enforces an absolute
+8,192-target ceiling even if a caller supplies a larger cap.
+
+This is deliberately a pure validation gate, not a Horizon adapter: it does
+not call `world.loaded`, `world.block`, `border.contains`, or
+`registry.state` itself. The native adapter must collect those facts from the
+pinned Wrench-confirmed APIs, in target order, and must not mutate or load
+chunks while collecting them. A later commit phase must revalidate live state
+after confirmation because preflight snapshots can become stale.
+
+The new helper has unit tests for successful complete snapshots, unloaded
+chunks, all individual validation failures, duplicate/mismatched input, and
+the hard cap. These tests have been added to source but have not been run in
+this update. No native hook or world write was enabled.
