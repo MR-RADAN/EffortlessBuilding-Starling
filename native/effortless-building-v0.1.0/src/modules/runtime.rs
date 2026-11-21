@@ -2,7 +2,7 @@
 // The screen is a UI-only milestone: tool choice is persisted, but this
 // module still does not read or modify blocks in the world.
 
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Mutex;
 
 pub const ID: &str = "effortless_building";
