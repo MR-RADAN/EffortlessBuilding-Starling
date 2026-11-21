@@ -56,6 +56,12 @@ pub(super) enum NativePreflightError {
     UnresolvedState { index: usize },
 }
 
+/// Drop coordinate-only preview allocations when their owning world session ends.
+pub(super) fn reset_effortless_building_preview() {
+    PREVIEW_PLAN.with(|cache| *cache.borrow_mut() = None);
+    PREVIEW_LINES.with(|lines| lines.borrow_mut().clear());
+}
+
 impl Game<'_> {
     /// Capture a main-hand block use as one corner of the build selection.
     /// Guests connected to another server are deliberately not intercepted.
