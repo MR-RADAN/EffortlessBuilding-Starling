@@ -1246,7 +1246,8 @@ mod build_queue_tests {
     fn zero_budget_does_not_advance_and_cancel_releases_work() {
         let mut q = queue(10);
         assert_eq!(q.next_range(0), 0..0);
-        assert!(!q.commit_batch(0..1));
+        assert!(!q.commit_batch(0..0));
+        assert_eq!(q.progress(), (0, 10));
         q.cancel();
         assert_eq!(q.progress(), (0, 0));
         assert!(q.is_complete());
