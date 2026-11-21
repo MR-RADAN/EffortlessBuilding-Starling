@@ -6,9 +6,11 @@ Target revision: `ff303502a4f7982551a0e0d3622d9268efe9e829`
 
 ## Verified route for this package
 
-The current artifact is a legacy `.hnmod` `horizon-mixins` bundle. It does
-not receive `&mut dyn ServerHost`, and it cannot call a server API merely by
-adding a similarly shaped function to an injected `Game<'_>` module.
+The active migration branch is a Native SDK 0.2 `.hmod` source package whose
+modules and mixins are injected into Starling's `Game<'_>` implementation. It
+does not receive `&mut dyn ServerHost`, and it cannot call a server API merely
+by adding a similarly shaped function to an injected `Game<'_>` module. The
+older `.hnmod` bundle is retained only as historical reference.
 
 The supported reference for this exact package type is Starling 0.9.0's own
 Wrench mod at `native-mods/wrench/mixins/wrench/native.rs`. It handles
@@ -29,7 +31,7 @@ native code-mod integration.
 - Reject remote server clients, missing players, spectators, and non-acting
   server/window contexts.
 - Resolve a frozen, unique target list before the first write.
-- Enforce the 16,384-position operation cap before allocating snapshots.
+- Enforce the 8,192-position operation cap before allocating snapshots.
 - Validate every target against world Y layout, loaded chunk state, world
   border, and player reach where the action is player initiated.
 - Never implicitly load chunks.
