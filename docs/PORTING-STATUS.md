@@ -33,5 +33,9 @@ These pins must not be replaced with newer template pins without checking the us
 7. Unlimited Blocks is only valid where the authoritative server accepts edits; it is not a client-side multiplayer bypass.
 8. The native screen runs over the world and does not pause singleplayer. Touch isolation must not modify Starling, MCPE or GoyControl touch layouts.
 
+## Starling 0.9.0 compatibility gate
+
+The owner reports an installed app version of 0.9.0, but the public Starling release/build-service sources inspected on 2026-11-21 establish only a 0.8.0 release mapping in `starling-client/mod-builds/versions.json`. The existing pins below therefore remain historical 0.8.0 pins and must not be presented as compatible with the reported 0.9.0 app. See [the compatibility audit](STARLING-0.9.0-COMPATIBILITY-AUDIT.md). Do not package or claim a 0.9.0 native bundle until the installed APK's exact source commit and matching build-service version/cache are identified.
+
 ## Next gate
 Inspect exact 0.8.0 Horizon and horizon-mixins source for hook names, signatures and block-edit semantics. Only then add hook configuration and the native adapter. Do not guess hook names.
