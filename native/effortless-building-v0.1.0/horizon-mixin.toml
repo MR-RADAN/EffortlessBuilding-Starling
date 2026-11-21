@@ -35,7 +35,7 @@ bindings = [
 ]
 
 [[injection]]
-id = "preview"
+id = "world_preview"
 kind = "HEAD"
 target = "horizon_client::game::native_hooks::Game<'_>::native_submit_custom_geometry"
 helper = "preview.rs"
