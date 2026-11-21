@@ -120,3 +120,28 @@ or mutate the world. The 4,096 large-build warning remains a UI concern.
 This is a planning milestone only. World-boundary/chunk-loaded checks,
 replacement-state validation, explicit confirmation, batched writes, and
 undo bookkeeping are not implemented. No placement is enabled.
+
+
+## Integration review — bounded plan is not yet a world validator
+
+A follow-up review of the current `native.rs`, `runtime.rs`, and
+`horizon-mixin.toml` confirms that `plan_target_positions` is currently a
+pure coordinate helper and is not called by the preview or a placement path.
+It must not be treated as proof that targets are valid in the active world.
+
+The native mixin still captures points through `Game::pick()`; the preview
+draws a geometric outline and sample crosses only. Neither path checks world
+border, loaded-chunk state, target replaceability, or a selected block state.
+
+The pinned Horizon source could not be re-resolved through the connected
+repository lookup during this pass, so no world-query API names or signatures
+are added by guesswork. Before placement work resumes, resolve the exact
+upstream repository for revision `ff303502a4f7982551a0e0d3622d9268efe9e829`
+and inspect the Wrench implementation and world/chunk accessors at that
+revision.
+
+Also, the current planner's Wall geometry is still volumetric (same target
+count as Cube). Do not expose Wall placement until its intended plane/orientation
+semantics are defined and the planner, count, and preview all agree.
+
+No world writes, chunk loads, or placement hooks were added in this milestone.
