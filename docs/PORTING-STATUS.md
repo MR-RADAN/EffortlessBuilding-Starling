@@ -46,8 +46,8 @@ Historical 0.8.0 build and pin information is retained in
   The per-thread line buffer is reused between frames; the renderer's own
   fixed-capacity batch validates the whole submission atomically.
 - The builder screen calculates the selected tool's exact geometric block
-  count with wide arithmetic and flags any selection above the 16,384-block
-  core limit before any commit can be offered.
+  target-position count with wide arithmetic and flags any selection above the
+  16,384-position core limit before any commit can be offered.
 - The preview represents the selected region, not individual ghost block
   states. It does not read block snapshots or modify the world.
 - Point capture and preview remain source-only until the next native Android
