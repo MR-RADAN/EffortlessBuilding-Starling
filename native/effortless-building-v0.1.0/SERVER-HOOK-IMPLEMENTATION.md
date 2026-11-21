@@ -286,3 +286,30 @@ This is still a source-level implementation only. No compile or device test
 was run, so Rust visibility/type compatibility must be confirmed by the
 project's native build before this adapter is relied upon. No placement or
 world-write hook was added.
+
+## Frozen native preflight bridge (read-only)
+
+The native preflight entry point now derives its targets internally from the current
+selection and selected tool via `plan_target_positions`; it no longer accepts an
+arbitrary target slice. It rejects an empty/oversized plan and independently checks
+uniqueness before collecting world facts. Target order is preserved from the planner.
+
+At the pinned Horizon revision, `horizon_world::registry::BlockStateId` is declared
+as the public tuple struct `BlockStateId(pub u32)`. The native adapter resolves the
+state through the registry and exports the exact registry-local numeric identity as
+`before_state: u32`; no debug/string parsing or guessed conversion is used.
+
+**Crate boundary remains a blocker for directly invoking the pure-core validator:**
+the repository's `Cargo.toml` defines a standalone package
+`effortless_building_mr`, while the native mixin source is injected into the
+Horizon `horizon-client` crate. The current mixin manifest does not declare or
+wire this package as a Horizon dependency. Therefore the adapter does not fabricate
+a `crate::preflight_targets` call or pretend the pure-core types are in scope.
+The typed handoff is the ordered `NativePreflightBlock { pos: [i32; 3],
+before_state: u32 }` vector, with all native world predicates already checked.
+A future explicit dependency/wiring step can map this DTO to
+`BlockPos`/`PreflightBlock` without changing numeric identity.
+
+This remains read-only: no confirmation UI, block placement, inventory access,
+chunk loading, or rollback behavior was added. Compile and device tests have not
+been run for this change.
