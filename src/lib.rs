@@ -900,3 +900,206 @@ mod overflow_regression_tests {
     }
 }
 
+
+
+/// Bounded in-memory history for already committed build transactions.
+/// Planning an undo/redo is read-only; callers move entries between stacks
+/// only after the authoritative server edit reports the complete change count.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BuildHistory {
+    undo: Vec<Vec<BlockChange>>,
+    redo: Vec<Vec<BlockChange>>,
+    max_transactions: usize,
+    max_blocks: usize,
+    stored_blocks: usize,
+}
+
+impl BuildHistory {
+    pub fn new(max_transactions: usize, max_blocks: usize) -> Self {
+        Self {
+            undo: Vec::new(),
+            redo: Vec::new(),
+            max_transactions,
+            max_blocks,
+            stored_blocks: 0,
+        }
+    }
+
+    /// Record a transaction only after its world commit has been confirmed.
+    /// New commits invalidate redo history. Duplicate positions and no-op
+    /// changes are rejected rather than stored ambiguously.
+    pub fn record_commit(&mut self, changes: Vec<BlockChange>) -> Result<(), GeometryError> {
+        if self.max_transactions == 0 || self.max_blocks == 0 || changes.is_empty() {
+            return Err(GeometryError::InvalidBatchSize);
+        }
+        if changes.len() > self.max_blocks {
+            return Err(GeometryError::TooManyBlocks);
+        }
+        let mut seen = BTreeSet::new();
+        for change in &changes {
+            if change.before_state == change.after_state || !seen.insert(change.pos) {
+                return Err(GeometryError::InvalidBatchSize);
+            }
+        }
+
+        let redo_blocks: usize = self.redo.iter().map(Vec::len).sum();
+        self.stored_blocks = self.stored_blocks.saturating_sub(redo_blocks);
+        self.redo.clear();
+
+        while self.undo.len() + self.redo.len() >= self.max_transactions
+            || self.stored_blocks.saturating_add(changes.len()) > self.max_blocks
+        {
+            if !self.undo.is_empty() {
+                let evicted = self.undo.remove(0);
+                self.stored_blocks = self.stored_blocks.saturating_sub(evicted.len());
+            } else if !self.redo.is_empty() {
+                let evicted = self.redo.remove(0);
+                self.stored_blocks = self.stored_blocks.saturating_sub(evicted.len());
+            } else {
+                return Err(GeometryError::TooManyBlocks);
+            }
+        }
+
+        self.stored_blocks += changes.len();
+        self.undo.push(changes);
+        Ok(())
+    }
+
+    /// Prepare an undo against a fresh snapshot. No history state changes.
+    pub fn plan_undo(&self, current: &[SnapshotBlock]) -> Result<Vec<BlockChange>, GeometryError> {
+        let recorded = self.undo.last().ok_or(GeometryError::InvalidBatchSize)?;
+        plan_guarded_history(recorded, current, TransactionDirection::Undo, self.max_blocks)
+    }
+
+    /// Move the last undo entry only after the caller confirms the inverse edit succeeded.
+    pub fn mark_undo_applied(&mut self) -> Result<(), GeometryError> {
+        let entry = self.undo.pop().ok_or(GeometryError::InvalidBatchSize)?;
+        self.redo.push(entry);
+        Ok(())
+    }
+
+    /// Prepare a redo against a fresh snapshot. No history state changes.
+    pub fn plan_redo(&self, current: &[SnapshotBlock]) -> Result<Vec<BlockChange>, GeometryError> {
+        let recorded = self.redo.last().ok_or(GeometryError::InvalidBatchSize)?;
+        plan_guarded_history(recorded, current, TransactionDirection::Redo, self.max_blocks)
+    }
+
+    /// Move the last redo entry only after the caller confirms the forward edit succeeded.
+    pub fn mark_redo_applied(&mut self) -> Result<(), GeometryError> {
+        let entry = self.redo.pop().ok_or(GeometryError::InvalidBatchSize)?;
+        self.undo.push(entry);
+        Ok(())
+    }
+
+    pub fn undo_depth(&self) -> usize { self.undo.len() }
+    pub fn redo_depth(&self) -> usize { self.redo.len() }
+    pub fn stored_blocks(&self) -> usize { self.stored_blocks }
+}
+
+#[cfg(test)]
+mod build_history_tests {
+    use super::*;
+
+    fn transaction(x: i32, before: u32, after: u32) -> Vec<BlockChange> {
+        vec![BlockChange {
+            pos: BlockPos::new(x, 4, 8),
+            before_state: before,
+            after_state: after,
+        }]
+    }
+
+    #[test]
+    fn history_moves_entries_only_after_confirmed_undo_and_redo() {
+        let mut history = BuildHistory::new(8, 64);
+        history.record_commit(transaction(1, 2, 9)).unwrap();
+        assert_eq!(history.undo_depth(), 1);
+        assert_eq!(history.redo_depth(), 0);
+
+        let after = [SnapshotBlock {
+            pos: BlockPos::new(1, 4, 8),
+            palette_index: 9,
+        }];
+        assert_eq!(
+            history.plan_undo(&after).unwrap(),
+            vec![BlockChange {
+                pos: BlockPos::new(1, 4, 8),
+                before_state: 9,
+                after_state: 2,
+            }]
+        );
+        assert_eq!(history.undo_depth(), 1, "planning is read-only");
+        history.mark_undo_applied().unwrap();
+        assert_eq!((history.undo_depth(), history.redo_depth()), (0, 1));
+
+        let before = [SnapshotBlock {
+            pos: BlockPos::new(1, 4, 8),
+            palette_index: 2,
+        }];
+        assert_eq!(
+            history.plan_redo(&before).unwrap(),
+            vec![BlockChange {
+                pos: BlockPos::new(1, 4, 8),
+                before_state: 2,
+                after_state: 9,
+            }]
+        );
+        history.mark_redo_applied().unwrap();
+        assert_eq!((history.undo_depth(), history.redo_depth()), (1, 0));
+    }
+
+    #[test]
+    fn stale_snapshot_rejects_undo_without_moving_history() {
+        let mut history = BuildHistory::new(8, 64);
+        history.record_commit(transaction(1, 2, 9)).unwrap();
+        let stale = [SnapshotBlock {
+            pos: BlockPos::new(1, 4, 8),
+            palette_index: 7,
+        }];
+        assert_eq!(
+            history.plan_undo(&stale),
+            Err(GeometryError::InvalidBatchSize)
+        );
+        assert_eq!((history.undo_depth(), history.redo_depth()), (1, 0));
+    }
+
+    #[test]
+    fn new_commit_clears_redo_and_history_caps_evict_oldest_entries() {
+        let mut history = BuildHistory::new(2, 2);
+        history.record_commit(transaction(1, 1, 2)).unwrap();
+        history.record_commit(transaction(2, 1, 2)).unwrap();
+        history.record_commit(transaction(3, 1, 2)).unwrap();
+        assert_eq!(history.undo_depth(), 2);
+        assert_eq!(history.stored_blocks(), 2);
+
+        history.mark_undo_applied().unwrap();
+        assert_eq!(history.redo_depth(), 1);
+        history.record_commit(transaction(4, 1, 2)).unwrap();
+        assert_eq!(history.redo_depth(), 0);
+        assert_eq!(history.undo_depth(), 2);
+        assert_eq!(history.stored_blocks(), 2);
+    }
+
+    #[test]
+    fn history_rejects_ambiguous_or_oversized_transactions() {
+        let mut history = BuildHistory::new(4, 2);
+        assert_eq!(
+            history.record_commit(transaction(1, 4, 4)),
+            Err(GeometryError::InvalidBatchSize)
+        );
+        assert_eq!(
+            history.record_commit(vec![
+                BlockChange { pos: BlockPos::new(1, 0, 0), before_state: 1, after_state: 2 },
+                BlockChange { pos: BlockPos::new(1, 0, 0), before_state: 2, after_state: 3 },
+            ]),
+            Err(GeometryError::InvalidBatchSize)
+        );
+        assert_eq!(
+            history.record_commit(vec![
+                BlockChange { pos: BlockPos::new(1, 0, 0), before_state: 1, after_state: 2 },
+                BlockChange { pos: BlockPos::new(2, 0, 0), before_state: 1, after_state: 2 },
+                BlockChange { pos: BlockPos::new(3, 0, 0), before_state: 1, after_state: 2 },
+            ]),
+            Err(GeometryError::TooManyBlocks)
+        );
+    }
+}
