@@ -56,6 +56,38 @@ pub fn clear_selection_points() {
     *SELECTION_POINTS.lock().unwrap_or_else(|e| e.into_inner()) = SelectionPoints::default();
 }
 
+pub fn selection_block_count_for(selection: SelectionPoints, tool: usize) -> Option<u128> {
+    let (a, b) = (selection.first?, selection.second?);
+    let span = |x: i32, y: i32| -> u128 {
+        (i64::from(x.max(y)) - i64::from(x.min(y)) + 1) as u128
+    };
+    let dx = span(a[0], b[0]);
+    let dy = span(a[1], b[1]);
+    let dz = span(a[2], b[2]);
+    match tool {
+        0 => dx.checked_mul(dz),
+        1 | 3 => dx.checked_mul(dy)?.checked_mul(dz),
+        2 => Some(dy),
+        _ => None,
+    }
+}
+
+pub fn selection_block_count(tool: usize) -> Option<u128> {
+    selection_block_count_for(selection_points(), tool)
+}
+
+pub fn selection_label_for_tool(tool: usize) -> String {
+    let mut label = selection_label();
+    if let Some(count) = selection_block_count(tool) {
+        if count > 16_384 {
+            label.push_str(&format!(" | {count} blocks (limit 16384)"));
+        } else {
+            label.push_str(&format!(" | {count} blocks"));
+        }
+    }
+    label
+}
+
 pub fn selection_label() -> String {
     let state = selection_points();
     match (state.first, state.second) {
@@ -244,7 +276,7 @@ pub fn draw_screen(
 
     game.native_text(
         batch,
-        &selection_label(),
+        &selection_label_for_tool(selected),
         [px + 14.0, layout.footer_y - 18.0],
         0xD6E2EE,
         false,
@@ -311,5 +343,35 @@ mod selection_point_tests {
         assert_eq!(selection, SelectionPoints { first: Some([1, 2, 3]), second: Some([4, 5, 6]) });
         selection.record([-7, 8, 9]);
         assert_eq!(selection, SelectionPoints { first: Some([-7, 8, 9]), second: None });
+    }
+}
+
+
+#[cfg(test)]
+mod selection_count_tests {
+    use super::*;
+
+    #[test]
+    fn selected_tool_counts_match_two_corner_geometry() {
+        let selection = SelectionPoints {
+            first: Some([1, 2, 3]),
+            second: Some([2, 4, 6]),
+        };
+        assert_eq!(selection_block_count_for(selection, 0), Some(8));
+        assert_eq!(selection_block_count_for(selection, 1), Some(24));
+        assert_eq!(selection_block_count_for(selection, 2), Some(3));
+        assert_eq!(selection_block_count_for(selection, 3), Some(24));
+    }
+
+    #[test]
+    fn selection_count_uses_wide_checked_arithmetic() {
+        let selection = SelectionPoints {
+            first: Some([i32::MIN, i32::MIN, i32::MIN]),
+            second: Some([i32::MAX, i32::MAX, i32::MAX]),
+        };
+        assert_eq!(
+            selection_block_count_for(selection, 3),
+            Some(1u128 << 96)
+        );
     }
 }
