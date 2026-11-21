@@ -148,7 +148,9 @@ pub fn sampled_plan_indices(len: usize, cap: usize) -> Vec<usize> {
     match count {
         0 => Vec::new(),
         1 => vec![0],
-        _ => (0..count).map(|i| i * (len - 1) / (count - 1)).collect(),
+        _ => (0..count)
+            .map(|i| ((i as u128 * (len - 1) as u128) / (count - 1) as u128) as usize)
+            .collect(),
     }
 }
 
@@ -395,6 +397,11 @@ mod tests {
         assert_eq!(indices.last(), Some(&8_191));
         assert!(indices.windows(2).all(|pair| pair[0] < pair[1]));
         assert!(indices.windows(2).all(|pair| pair[1] - pair[0] <= 131));
+
+        let huge = sampled_plan_indices(usize::MAX, 64);
+        assert_eq!(huge.first(), Some(&0));
+        assert_eq!(huge.last(), Some(&(usize::MAX - 1)));
+        assert!(huge.windows(2).all(|pair| pair[0] < pair[1]));
     }
 
     #[test]
