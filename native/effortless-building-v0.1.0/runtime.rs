@@ -14,7 +14,8 @@ pub const DESCRIPTION: &str =
     "Mobile-first building tools: Floor, Wall, Pillar and Cube; select two world points with right-click.";
 
 pub const TOOLS: [&str; 4] = ["Floor", "Wall", "Pillar", "Cube"];
-pub const ACTION_CLOSE: i32 = 4;
+pub const ACTION_PREFLIGHT: i32 = 4;
+pub const ACTION_CLOSE: i32 = 5;
 pub const SELECTION_ITEM: &str = "minecraft:stick";
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -168,12 +169,18 @@ pub fn selection_label() -> String {
 
 const NO_ACTION: i32 = -1;
 static PENDING_UI_ACTION: AtomicI32 = AtomicI32::new(NO_ACTION);
+static PREFLIGHT_STATUS: Mutex<String> = Mutex::new(String::new());
+
+pub fn preflight_status() -> String {
+    PREFLIGHT_STATUS.lock().unwrap_or_else(|e| e.into_inner()).clone()
+}
 static CAPTURED_LEFT_PRESS: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct UiLayout {
     pub panel: [f32; 4],
     pub tools: [[f32; 4]; 4],
+    pub preflight: [f32; 4],
     pub close: [f32; 4],
     pub footer_y: f32,
 }
@@ -229,10 +236,16 @@ pub fn ui_layout(rect: [f32; 4]) -> UiLayout {
             [left, panel_y + 110.0 * scale, button_w, button_h],
             [right, panel_y + 110.0 * scale, button_w, button_h],
         ],
-        close: [
+        preflight: [
             panel_x + 14.0,
             panel_y + 156.0 * scale,
-            (panel_w - 28.0).max(0.0),
+            (panel_w - 36.0) * 0.5,
+            button_h,
+        ],
+        close: [
+            panel_x + 22.0 + (panel_w - 36.0) * 0.5,
+            panel_y + 156.0 * scale,
+            (panel_w - 36.0) * 0.5,
             button_h,
         ],
         footer_y: panel_y + 202.0 * scale,
@@ -252,6 +265,9 @@ pub fn ui_action_at(layout: &UiLayout, point: [f32; 2]) -> Option<i32> {
         if contains(*rect, point) {
             return Some(index as i32);
         }
+    }
+    if contains(layout.preflight, point) {
+        return Some(ACTION_PREFLIGHT);
     }
     contains(layout.close, point).then_some(ACTION_CLOSE)
 }
@@ -279,6 +295,13 @@ pub fn process_pending_ui_action(game: &mut crate::game::Game<'_>) {
     match PENDING_UI_ACTION.swap(NO_ACTION, Ordering::AcqRel) {
         action if (0..TOOLS.len() as i32).contains(&action) => {
             game.native_set_setting(ID, "tool", &action.to_string());
+        }
+        ACTION_PREFLIGHT => {
+            let status = match game.effortless_building_preflight_selection() {
+                Ok(plan) => format!("Preflight OK: {} targets validated; no blocks changed", plan.blocks.len()),
+                Err(error) => format!("Preflight failed: {error:?}"),
+            };
+            *PREFLIGHT_STATUS.lock().unwrap_or_else(|e| e.into_inner()) = status;
         }
         ACTION_CLOSE => {
             game.native_mod_screen_close(ID);
@@ -328,17 +351,17 @@ pub fn draw_screen(
         game.native_text(batch, &label, [tx, ty], 0xFFFFFF, true);
     }
 
+    game.native_fill(batch, layout.preflight, 0xFF245B43);
+    let check_label = "Check area";
+    let check_x = layout.preflight[0]
+        + (layout.preflight[2] - game.native_text_width(check_label)) * 0.5;
+    game.native_text(batch, check_label, [check_x, layout.preflight[1] + (layout.preflight[3] - 9.0) * 0.5], 0xFFFFFF, true);
+
     game.native_fill(batch, layout.close, 0xFF613B43);
     let close_label = "Close";
     let close_x = layout.close[0]
         + (layout.close[2] - game.native_text_width(close_label)) * 0.5;
-    game.native_text(
-        batch,
-        close_label,
-        [close_x, layout.close[1] + (layout.close[3] - 9.0) * 0.5],
-        0xFFFFFF,
-        true,
-    );
+    game.native_text(batch, close_label, [close_x, layout.close[1] + (layout.close[3] - 9.0) * 0.5], 0xFFFFFF, true);
 
     game.native_text(
         batch,
@@ -347,13 +370,8 @@ pub fn draw_screen(
         0xD6E2EE,
         false,
     );
-    game.native_text(
-        batch,
-        "Hold a stick; close and right-click two blocks to set A and B",
-        [px + 14.0, layout.footer_y],
-        0xB8C4D0,
-        false,
-    );
+    game.native_text(batch, &preflight_status(), [px + 14.0, layout.footer_y], 0xB8C4D0, false);
+    game.native_text(batch, "Hold a stick; close and right-click two blocks to set A and B", [px + 14.0, layout.footer_y + 12.0], 0xB8C4D0, false);
 }
 
 #[cfg(test)]
