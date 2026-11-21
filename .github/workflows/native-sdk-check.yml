@@ -65,3 +65,18 @@ jobs:
       - name: Verify signed SDK pin and check mod crate
         working-directory: native/effortless-building-v0.1.0
         run: cargo horizon-mod check
+
+      - name: Package the native source mod
+        working-directory: native/effortless-building-v0.1.0
+        run: |
+          cargo horizon-mod build
+          test -s target/horizon-mod/effortless_building.hmod
+          cargo horizon-mod check target/horizon-mod/effortless_building.hmod
+
+      - name: Upload HMOD package
+        uses: actions/upload-artifact@v4
+        with:
+          name: effortless-building-v0.1.0-hmod
+          path: native/effortless-building-v0.1.0/target/horizon-mod/effortless_building.hmod
+          if-no-files-found: error
+          retention-days: 14
