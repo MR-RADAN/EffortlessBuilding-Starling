@@ -13,6 +13,12 @@ name = "effortless_building_native"
 source = "native.rs"
 
 [[module]]
+id = "preview"
+file = "crates/horizon-client/src/game.rs"
+name = "effortless_building_preview"
+source = "preview.rs"
+
+[[module]]
 id = "runtime"
 file = "crates/horizon-client/src/game.rs"
 name = "effortless_building"
@@ -26,6 +32,17 @@ target = "horizon_client::game::Game<'_>::use_item"
 helper = "use.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+[[injection]]
+id = "preview"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_submit_custom_geometry"
+helper = "preview.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "view", ty = "&crate::mod_api::WorldRenderView", value = "view" },
+  { name = "draw", ty = "&mut horizon_client::world_geometry::WorldGeometry", value = "draw" },
 ]
 
 [[injection]]
