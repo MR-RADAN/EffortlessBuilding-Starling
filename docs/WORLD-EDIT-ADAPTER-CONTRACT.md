@@ -22,8 +22,7 @@ uses `self.with_level(|behaviours, level, ticks| ...)` to call
 
 The correct 0.1.0 implementation must follow this in-process Game/behaviour
 route. Do not use the separate `#[mod_api::horizon_mod] impl Hooks` /
-`ServerHost` design in this legacy bundle. That API belongs to a different
-native code-mod integration.
+`ServerHost` design. That API belongs to a different native code-mod integration.
 
 ## Authority and preflight
 
@@ -32,8 +31,10 @@ native code-mod integration.
   server/window contexts.
 - Resolve a frozen, unique target list before the first write.
 - Enforce the 8,192-position operation cap before allocating snapshots.
-- Validate every target against world Y layout, loaded chunk state, world
-  border, and player reach where the action is player initiated.
+- Validate every target against world Y layout, loaded chunk state, and world
+  border. For player-initiated work, require at least one selected corner to
+  remain within reach; do not require every block in a large selected volume
+  to be within arm's reach.
 - Never implicitly load chunks.
 - Require an explicit confirmation action after selection and preview.
 - Selection, tool selection, menu navigation, and preview rendering remain
