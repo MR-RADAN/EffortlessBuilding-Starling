@@ -313,3 +313,22 @@ A future explicit dependency/wiring step can map this DTO to
 This remains read-only: no confirmation UI, block placement, inventory access,
 chunk loading, or rollback behavior was added. Compile and device tests have not
 been run for this change.
+
+## Typed native-to-core handoff refinement
+
+The native preflight record now retains
+`horizon_world::registry::BlockStateId` rather than prematurely erasing it
+to `u32`. This matters because the numeric ID is scoped to the active block
+registry, not a globally stable block identifier. The explicit
+`core_before_state()` accessor exposes the exact `u32` representation
+required by `WorldPreflightInput::before_state: Option<u32>`, but only at
+the handoff boundary. The native record must not be retained across a world
+or registry replacement.
+
+The current repository still has no declared dependency from the injected
+Horizon client crate to this standalone package, and `horizon-mixin.toml`
+only injects source modules into Horizon files. Thus this refinement makes
+the boundary type-safe without inventing a cross-crate call. Direct execution
+of `preflight_targets` remains blocked on explicit build/importer wiring.
+No world writes, confirmation action, or inventory handling were added.
+Compile and device tests remain unrun.
