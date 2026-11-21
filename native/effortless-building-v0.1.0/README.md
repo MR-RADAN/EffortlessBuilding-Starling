@@ -8,7 +8,8 @@ Pinned Starling source: `ff303502a4f7982551a0e0d3622d9268efe9e829`
 ## Current native source functionality
 
 - Registers in the native Mods list and exposes Floor, Wall, Pillar and Cube.
-- Opens a dedicated builder screen with tool selection and a Close action.
+- Opens a dedicated builder screen with tool selection, a Clear action for both selected corners, and a Close action.
+- Clear is a selection-only action: it resets points A and B without changing the world or the selected tool.
 - Captures the main-hand block use only while holding a stick and only on the local game window. First use records point A, second records B, and third starts a new pair.
 - Uses Starling's own block ray-pick result; other held items retain normal use behavior.
 - Draws a read-only selection wireframe and up to 64 spatially distributed sample crosses.
