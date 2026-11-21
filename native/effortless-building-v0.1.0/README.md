@@ -19,16 +19,15 @@ The UI is a first native integration milestone, not the finished building mod. I
 
 Starling 0.8.0's source converts touch-pointer actions into cursor and mouse-button window events, and the native screen hooks consume left clicks on the panel. This supports the intended touch path at source level; Android in-game behavior still needs device testing.
 
-## Package
+## Package and native build
 
-The source-only .hnmod requests native hooks API 111 for the custom mod screen. The launcher compiles the bundled Rust source against its pinned Horizon revision. Successful ZIP packaging is not proof that the native mixin compiles or that the UI works in-game.
+The source-only .hnmod requests native hooks API 111 for the custom mod screen. The launcher compiles the bundled Rust source against its pinned Horizon revision.
+
+The ARM64 native library build against the exact Starling 0.8.0 release completed successfully in GitHub Actions on commit `48d00a4e2f2ab4030b4cf0ec2412073d9d685695`. This confirms that the current native mixin bundle applies and compiles against the pinned source. It does not establish that the screen renders or responds correctly in-game.
+
+- [Native ARM64 build run](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44834111100)
+- [Source bundle package run](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44834111076)
 
 ## Security
 
 No block-edit API is called by this milestone. World mutation remains disabled until the preview, snapshot validation, authoritative server adapter and explicit confirmation flow are connected and tested.
-
-
-## Native compilation validationA separate GitHub Actions workflow builds the ARM64 native library against
-the exact Starling 0.8.0 release source. See
-[Native Android build validation](../../docs/NATIVE-ANDROID-BUILD.md).
-The source-bundle ZIP check alone is not a native compilation check.
