@@ -52,7 +52,10 @@ Before showing confirmation:
 5. Reject block entities and states whose restoration semantics are not
    proven. Bulk edits cannot preserve arbitrary block-entity NBT.
 6. Store exact expected before/after states and bound both transaction count
-   and undo memory.
+   and undo memory. The pure-core history stores compact state indices; the
+   adapter must also retain the canonical palette-state strings needed to
+   recreate BlockEdit palettes and count that string table against the same
+   memory budget.
 
 ## Commit, undo and redo
 
