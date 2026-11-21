@@ -66,7 +66,6 @@ pub fn clear_selection_points() {
 pub fn reset_world_session() {
     clear_selection_points();
     PENDING_UI_ACTION.store(NO_ACTION, Ordering::Release);
-    clear_preflight_status();
     crate::game::effortless_building_native::reset_effortless_building_preview();
 }
 
