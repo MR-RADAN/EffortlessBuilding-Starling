@@ -74,8 +74,68 @@ pub fn selection_block_count_for(selection: SelectionPoints, tool: usize) -> Opt
     }
 }
 
+
 pub fn selection_block_count(tool: usize) -> Option<u128> {
     selection_block_count_for(selection_points(), tool)
+}
+
+/// A bounded, read-only coordinate plan. Produces unique targets in stable
+/// X/Y/Z order; it never reads or writes the world.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PlanError {
+    IncompleteSelection,
+    InvalidTool,
+    EmptySelection,
+    TooManyPositions { count: u128, limit: u128 },
+}
+
+pub fn plan_target_positions(
+    selection: SelectionPoints,
+    tool: usize,
+) -> Result<Vec<[i32; 3]>, PlanError> {
+    let (a, b) = (selection.first.ok_or(PlanError::IncompleteSelection)?,
+                  selection.second.ok_or(PlanError::IncompleteSelection)?);
+    let count = selection_block_count_for(selection, tool).ok_or(PlanError::InvalidTool)?;
+    if count == 0 {
+        return Err(PlanError::EmptySelection);
+    }
+    if count > MAX_BUILD_BLOCKS {
+        return Err(PlanError::TooManyPositions { count, limit: MAX_BUILD_BLOCKS });
+    }
+
+    let min_x = a[0].min(b[0]);
+    let max_x = a[0].max(b[0]);
+    let min_y = a[1].min(b[1]);
+    let max_y = a[1].max(b[1]);
+    let min_z = a[2].min(b[2]);
+    let max_z = a[2].max(b[2]);
+    let mut targets = Vec::with_capacity(count as usize);
+    match tool {
+        0 => {
+            for x in min_x..=max_x {
+                for z in min_z..=max_z {
+                    targets.push([x, min_y, z]);
+                }
+            }
+        }
+        1 | 3 => {
+            for x in min_x..=max_x {
+                for y in min_y..=max_y {
+                    for z in min_z..=max_z {
+                        targets.push([x, y, z]);
+                    }
+                }
+            }
+        }
+        2 => {
+            for y in min_y..=max_y {
+                targets.push([a[0], y, a[2]]);
+            }
+        }
+        _ => return Err(PlanError::InvalidTool),
+    }
+    debug_assert_eq!(targets.len() as u128, count);
+    Ok(targets)
 }
 
 pub fn selection_label_for_tool(tool: usize) -> String {
@@ -365,6 +425,48 @@ mod selection_count_tests {
         assert_eq!(selection_block_count_for(selection, 1), Some(24));
         assert_eq!(selection_block_count_for(selection, 2), Some(3));
         assert_eq!(selection_block_count_for(selection, 3), Some(24));
+    }
+
+    #[test]
+    fn target_plan_is_unique_stable_and_matches_tool_geometry() {
+        let selection = SelectionPoints {
+            first: Some([1, 2, 3]),
+            second: Some([2, 4, 6]),
+        };
+        let floor = plan_target_positions(selection, 0).unwrap();
+        assert_eq!(floor.len(), 8);
+        assert!(floor.iter().all(|p| p[1] == 2));
+        assert_eq!(floor[0], [1, 2, 3]);
+        assert_eq!(floor[7], [2, 2, 6]);
+
+        let pillar = plan_target_positions(selection, 2).unwrap();
+        assert_eq!(pillar, vec![[1, 2, 3], [1, 3, 3], [1, 4, 3]]);
+        let cube = plan_target_positions(selection, 3).unwrap();
+        assert_eq!(cube.len(), 24);
+        assert_eq!(cube[0], [1, 2, 3]);
+        assert_eq!(cube[23], [2, 4, 6]);
+    }
+
+    #[test]
+    fn target_plan_rejects_oversized_selection_before_allocation() {
+        let selection = SelectionPoints {
+            first: Some([0, 0, 0]),
+            second: Some([20, 20, 20]),
+        };
+        assert_eq!(
+            plan_target_positions(selection, 3),
+            Err(PlanError::TooManyPositions { count: 9_261, limit: MAX_BUILD_BLOCKS })
+        );
+    }
+
+    #[test]
+    fn target_plan_rejects_incomplete_or_invalid_requests() {
+        assert_eq!(
+            plan_target_positions(SelectionPoints::default(), 0),
+            Err(PlanError::IncompleteSelection)
+        );
+        let selection = SelectionPoints { first: Some([0, 0, 0]), second: Some([0, 0, 0]) };
+        assert_eq!(plan_target_positions(selection, 9), Err(PlanError::InvalidTool));
     }
 
     #[test]
