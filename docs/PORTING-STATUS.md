@@ -33,8 +33,13 @@ Historical 0.8.0 build and pin information is retained in
   wired through the native hook manifest.
 - Touch press/release inside the panel is captured to prevent the same click
   reaching the world.
-- The UI is still a tool-selection shell. It does not yet select world
-  coordinates, draw spatial preview markers, or change blocks.
+- The native UI exposes the four initial tools and reports the current point
+  selection. A cancellable `Game::use_item` hook mirrors Starling's Wrench
+  pattern: with the mod enabled, a main-hand right-click records the block
+  under the player's ray pick. First click sets A, second sets B, and a third
+  starts a new pair. The hook deliberately refuses remote multiplayer clients.
+- This point-capture implementation is source-only until the next native
+  Android build validates the new `use_item` hook and module.
 
 ## Starling 0.9.0 source audit
 
@@ -79,7 +84,8 @@ Verified directly against the pinned source:
 ## Not yet implemented or verified
 
 - No live world read/write adapter is connected to the UI.
-- No coordinate selection or world-space preview is implemented.
+- Two-point block selection is implemented in source but awaits native build
+  validation; no spatial preview markers are implemented.
 - No block placement, wall/floor/cuboid commit, or shape commit is available.
 - No live undo/redo is connected to snapshots.
 - No inventory consumption or Unlimited Blocks implementation is available.
