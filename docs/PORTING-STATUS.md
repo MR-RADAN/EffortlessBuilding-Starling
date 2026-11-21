@@ -67,11 +67,10 @@ Verified directly against the pinned source:
 
 ## Build validation
 
-- Rust core tests previously passed in GitHub Actions run
-  [44874732757](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44874732757)
-  for the earlier core revision. The current core source was rechecked and its
-  snapshot/guarded-history helpers are present; the latest CI run must validate
-  the current commit.
+- Rust core tests passed for the two-corner geometry commit in run
+  [44876221560](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44876221560).
+  Snapshot decoding, guarded undo/redo, transaction planning, selection
+  geometry and the existing overflow regressions are covered by the core test suite.
 - Source package validation passed in run
   [44875262029](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44875262029).
   This validates ZIP structure only, not importer acceptance or compilation.
