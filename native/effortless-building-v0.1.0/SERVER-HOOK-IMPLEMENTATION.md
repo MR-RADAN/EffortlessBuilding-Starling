@@ -27,11 +27,14 @@ impl Hooks for EffortlessBuilding {
 }
 ```
 
-The hook declaration is `Hooks::server_tick` in the pinned API vocabulary.
-Its generated event is named `ServerTickEvent`. The event's exact fields and
-phase representation must be read from the generated API for the pinned SDK;
-the adapter must not guess a phase field or assume that every invocation is
-the start phase. The server hook is the authority boundary; the existing
+The pinned hook catalog declares `fn server_tick()` as a server-side listen
+hook. The generated API dispatches it in two phases: `ServerTickStart` before
+any level ticks and `ServerTickEnd` after the last level tick. A paused pass
+fires no event; a frozen world reports `world_running == false` except during
+a requested step. `host.server_has_time()` reports whether optional work still
+fits before the next tick. Do not assume the current world/level is the target
+dimension: the API documentation explicitly says which level the server host
+holds is not defined. The server hook is the authority boundary; the existing
 client mixin remains responsible only for selection input, UI and drawing.
 
 ## Public host calls
@@ -84,3 +87,19 @@ connect it to the shared selection/request state. No live block mutation,
 inventory consumption, unlimited-block mode, or live undo/redo is enabled.
 This document records the verified integration boundary; it is not a claim
 that the adapter has been implemented or tested in-game.
+
+
+## Critical packaging distinction
+
+The currently installed `.hnmod` is a legacy `horizon-mixins` bundle. Its
+`Game<'_>` injections do not receive `&mut dyn ServerHost`; adding a method
+with a ServerHost-like signature inside `native.rs` cannot make that API
+available. The `ServerHost` route above describes a separate Horizon code-mod
+crate using `horizon-mod-api`, not a callable helper in this mixin bundle.
+
+Starling's Wrench native mod demonstrates the alternative supported path for
+the current bundle: mutate only the acting single-player/LAN server's
+`Game` world through its existing `with_level` / level block APIs, and refuse
+remote clients. This is likely the smaller integration path for this project,
+but it still needs a carefully preflighted transaction adapter and verified
+rollback/partial-failure handling before it can be enabled.
