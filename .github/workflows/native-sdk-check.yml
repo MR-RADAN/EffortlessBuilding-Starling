@@ -71,12 +71,13 @@ jobs:
         run: |
           cargo horizon-mod build
           test -s target/horizon-mod/effortless_building.hmod
-          cargo horizon-mod check target/horizon-mod/effortless_building.hmod
+          mv target/horizon-mod/effortless_building.hmod target/horizon-mod/effortless_building-0.1.0.hmod
+          cargo horizon-mod check target/horizon-mod/effortless_building-0.1.0.hmod
 
       - name: Upload HMOD package
         uses: actions/upload-artifact@v4
         with:
           name: effortless-building-v0.1.0-hmod
-          path: native/effortless-building-v0.1.0/target/horizon-mod/effortless_building.hmod
+          path: native/effortless-building-v0.1.0/target/horizon-mod/effortless_building-0.1.0.hmod
           if-no-files-found: error
           retention-days: 14
