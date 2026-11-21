@@ -2,7 +2,8 @@
 
 Base: `29308e65d4af8e96488561a9eb465f5b05501742`
 
-Target: Starling `ff303502a4f7982551a0e0d3622d9268efe9e829` (0.9.0).
+Target source: Starling `ff303502a4f7982551a0e0d3622d9268efe9e829` (0.9.0).  
+Horizon SDK build: `4dc6455d4a6773224792eb1f121a9b939dff3170` (published signed SDK release).
 
 ## Confirmed project format
 
@@ -32,14 +33,14 @@ Preserve the three game-module support modules by moving their source paths unde
 
 - Do not enable world writes in this migration.
 - Keep current preflight read-only and retain the 8192 unique-target cap.
-- Preserve the existing exact game and mixins pins; do not regenerate pins from a newer Starling build.
+- Keep the Starling source pin, Horizon SDK build pin, game version, and mixins-tool pin as separate identities. The `[native] horizon` field must name a published Horizon SDK build, not the Starling source commit.
 - Run source/layout validation before any native build.
 - Do not rebuild the Starling ARM64 client. Only build the standalone native mod if and when a verified migration is ready.
 - Confirm the produced package is `.hmod` and validate its manifest/layout; do not label the prior ARM64 ZIP as an importable mod package.
 
 ## Migration implementation status
 
-The SDK 0.2 project skeleton has now been added alongside the legacy files:
+The SDK 0.2 project skeleton has now been added. The first CI attempt exposed that `[native] horizon` incorrectly contained the Starling source SHA; it now points to the published Horizon SDK build above. The Starling checkout remains independently pinned in the workflow. The project includes:
 - `horizon-mod.toml` pins the original Starling/Horizon and mixins revisions and declares all 9 mixins plus all 3 support modules.
 - `Cargo.toml` follows the pinned generator's edition-2024 and local SDK dependency layout.
 - `src/modules/` and `src/mixins/` contain source-preserving copies of all 12 legacy Rust files.
