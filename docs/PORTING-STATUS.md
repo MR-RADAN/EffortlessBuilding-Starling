@@ -87,7 +87,9 @@ Verified directly against the pinned source:
   [44877215141](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44877215141).
   All 46 tests passed: snapshot decoding, guarded undo/redo, bounded history
   transitions, two-corner selection geometry and overflow regressions.
-- Source package validation passed in run
+- Latest source package validation passed in run
+  [44878280192](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44878280192). Its artifact (9,648-byte outer ZIP containing the 10,783-byte `.hnmod`) was downloaded and inspected: the inner archive contains `horizon-native.json`, `horizon-mixin.toml`, all three Rust modules and all nine helper files; both ZIP integrity checks pass. This validates package structure, not importer acceptance or native compilation.
+- Earlier source package validation also passed in run
   [44875262029](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44875262029).
   This validates ZIP structure only, not importer acceptance or compilation.
 - The first Starling 0.9.0 build,
