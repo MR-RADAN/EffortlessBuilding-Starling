@@ -68,7 +68,8 @@ pub fn selection_block_count_for(selection: SelectionPoints, tool: usize) -> Opt
     let dz = span(a[2], b[2]);
     match tool {
         0 => dx.checked_mul(dz),
-        1 | 3 => dx.checked_mul(dy)?.checked_mul(dz),
+        1 => None, // Wall plane/orientation is not finalized yet.
+        3 => dx.checked_mul(dy)?.checked_mul(dz),
         2 => Some(dy),
         _ => None,
     }
@@ -118,7 +119,8 @@ pub fn plan_target_positions(
                 }
             }
         }
-        1 | 3 => {
+        1 => return Err(PlanError::InvalidTool), // Never plan ambiguous wall geometry.
+        3 => {
             for x in min_x..=max_x {
                 for y in min_y..=max_y {
                     for z in min_z..=max_z {
@@ -306,7 +308,7 @@ pub fn draw_screen(
     game.native_fill(batch, [px + pw - 2.0, py, 2.0, ph], 0xFF4B657E);
 
     game.native_text(batch, "Effortless Building", [px + 14.0, py + 14.0], 0xFFFFFF, true);
-    game.native_text(batch, "Read-only outline and distributed preview markers", [px + 14.0, py + 36.0], 0xC8D4E0, false);
+    game.native_text(batch, "Read-only preview; Wall geometry is not finalized", [px + 14.0, py + 36.0], 0xC8D4E0, false);
 
     let selected = selected_tool(|key| game.native_setting(ID, key));
     for (index, rect) in layout.tools.iter().enumerate() {
