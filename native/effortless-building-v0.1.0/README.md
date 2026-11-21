@@ -27,3 +27,7 @@ The source hooks and package layout are being validated against the exact Starli
 - Metadata file: `horizon-native.json`
 - All Rust module sources and helper files referenced by `horizon-mixin.toml` must be included in the package.
 
+
+## Import package build
+
+The `.hnmod` archive is a source bundle for Starling's native build service; it intentionally does not embed `libhorizon_android.so`. The ARM64 shared library is produced by the pinned Starling native build pipeline and is validated separately. The package workflow checks the archive layout, metadata, and every Rust/TOML source referenced by `horizon-mixin.toml`.
