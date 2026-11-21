@@ -1,33 +1,29 @@
 # Effortless Building — native bundle 0.1.0
 
-Maintainer: MR
+Creator / port maintainer: MR  
+Upstream author: Requios  
+Target: Starling 0.9.0 / Horizon ARM64  
+Pinned Starling source: `ff303502a4f7982551a0e0d3622d9268efe9e829`
 
-Target: Starling 0.8.0 / Horizon 26.3, pinned to the release revisions.
+## Current native source functionality
 
-## Current functionality
+- Registers in the native Mods list and exposes Floor, Wall, Pillar and Cube.
+- Opens a dedicated builder screen with tool selection and a Close action.
+- Captures the main-hand block use only while holding a stick and only on the local game window. First use records point A, second records B, and third starts a new pair.
+- Uses Starling's own block ray-pick result; other held items retain normal use behavior.
+- Draws a read-only selection wireframe and up to 64 spatially distributed sample crosses.
+- Reports the geometric target-position count and warns when the selection exceeds the core's 16,384-position limit.
 
-- Registers in Options > Mods.
-- Persists selection of Floor, Wall, Pillar or Cube.
-- Opens a dedicated native mod screen from the settings page.
-- Renders a compact tool-selection panel using Starling's native screen render hook.
-- Routes left clicks through the native screen hooks and applies tool selection on the window tick.
-- Escape closes the dedicated screen; the panel also has a Close button.
+## Safety and implementation boundary
 
-The UI is a first native integration milestone, not the finished building mod. It does not yet select world coordinates, render a spatial/ghost preview, read block snapshots, place blocks, or implement undo/redo. The screen's footer explicitly says that no blocks are changed.
+This native milestone is read-only. It does not inspect live block states, place or remove blocks, consume inventory, bypass multiplayer authority, or implement live undo/redo. The pure Rust core contains geometry, snapshot-gated planning and guarded history primitives, but those are not yet connected to Starling's authoritative server-side edit API.
 
-## Touch and input
+The source hooks and package layout are being validated against the exact Starling 0.9.0 checkout by GitHub Actions. A successful source-package ZIP check is not proof of native compilation or launcher import. Even after ARM64 compilation succeeds, in-game Android testing is still required.
 
-Starling 0.8.0's source converts touch-pointer actions into cursor and mouse-button window events, and the native screen hooks consume left clicks on the panel. This supports the intended touch path at source level; Android in-game behavior still needs device testing.
+## Package
 
-## Package and native build
+- Native bundle directory: `native/effortless-building-v0.1.0/`
+- Package filename: `effortless_building-0.1.0.hnmod`
+- Metadata file: `horizon-native.json`
+- All Rust module sources and helper files referenced by `horizon-mixin.toml` must be included in the package.
 
-The source-only .hnmod requests native hooks API 111 for the custom mod screen. The launcher compiles the bundled Rust source against its pinned Horizon revision.
-
-The ARM64 native library build against the exact Starling 0.8.0 release completed successfully in GitHub Actions on commit `48d00a4e2f2ab4030b4cf0ec2412073d9d685695`. This confirms that the current native mixin bundle applies and compiles against the pinned source. It does not establish that the screen renders or responds correctly in-game.
-
-- [Native ARM64 build run](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44834111100)
-- [Source bundle package run](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44834111076)
-
-## Security
-
-No block-edit API is called by this milestone. World mutation remains disabled until the preview, snapshot validation, authoritative server adapter and explicit confirmation flow are connected and tested.
