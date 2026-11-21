@@ -170,6 +170,63 @@ impl Game<'_> {
 }
 
 impl Game<'_> {
+    /// Re-check a frozen preflight immediately before a future commit phase.
+    /// This is deliberately read-only: it rejects stale selection, authority,
+    /// world bounds, reach, unloaded chunks, and any block changed since capture.
+    pub(super) fn effortless_building_preflight_is_current(
+        &self,
+        plan: &NativePreflightPlan,
+    ) -> bool {
+        use crate::game::effortless_building as eb;
+
+        if self.remote.is_some()
+            || self.player.is_none()
+            || self.spectator()
+            || (self.lan_acting.is_none() && !self.native_window())
+            || eb::selection_points() != plan.selection
+            || eb::selected_tool(|key| self.native_setting(eb::ID, key)) != plan.tool
+            || plan.blocks.is_empty()
+            || plan.blocks.len() > 8_192
+        {
+            return false;
+        }
+
+        let layout = self.world.layout();
+        let reach = self.reach() + 1.0;
+        let eye = self.eye_position();
+        for block in &plan.blocks {
+            let [x, y, z] = block.pos;
+            if y < layout.min_y()
+                || y >= layout.max_y()
+                || !self.world.loaded(x, z)
+                || !self.border.contains(f64::from(x), f64::from(z))
+            {
+                return false;
+            }
+            let reachable = eye.is_some_and(|eye| {
+                let distance_squared: f64 = (0..3)
+                    .map(|axis| {
+                        (f64::from(block.pos[axis]) + 0.5 - eye[axis]).powi(2)
+                    })
+                    .sum();
+                distance_squared <= reach * reach
+            });
+            if !reachable {
+                return false;
+            }
+
+            let current_state = self.world.block(x, y, z);
+            if current_state != block.before_state
+                || self.pack.assets.registry.state(current_state).is_none()
+            {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+impl Game<'_> {
     /// Draw the exact bounded planner geometry. The cached plan is rebuilt
     /// only after selection/tool changes, avoiding per-frame coordinate work.
     /// Wall is intentionally omitted until its plane semantics are finalized.
