@@ -29,7 +29,7 @@ def main() -> int:
 
     manifest = manifest_path.read_text(encoding="utf-8")
     # Every module source and injection helper named by the manifest must ship.
-    referenced = set(re.findall(r'(?m)^\\s*(?:source|helper)\\s*=\\s*"([^"]+)"', manifest))
+    referenced = set(re.findall(r'(?m)^\s*(?:source|helper)\s*=\s*"([^"]+)"', manifest))
     source_files = sorted(
         p.name for p in SOURCE.iterdir()
         if p.is_file() and (p.suffix == ".rs" or p.name == "horizon-mixin.toml")
