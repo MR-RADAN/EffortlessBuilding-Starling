@@ -1,37 +1,63 @@
 # Effortless Building — Starling Edition
 
 - Project version: 1.2.0
-- Port maintainer: MR
+- Native bundle version: 0.1.0
+- Port maintainer / native bundle creator: MR
 - Upstream author: Requios
-- Intended target: Starling 0.9.0 (ARM64; source/build route under verification)
+- Target: Starling 0.9.0 / Horizon ARM64
 - Upstream license: LGPL-3.0-or-later
 
 ## Current state
 
-This repository contains the versioned project scaffold, a standalone Rust geometry/transaction core, a historical 0.8.0 Horizon/Mixins audit, and a corrected source-level audit of Starling 0.9.0's native bundle path. It remains a source prototype: it has not been compiled, packaged as an .hnmod, or tested in Starling.
+This repository contains a Starling 0.9.0 native bundle scaffold, a mobile
+builder tool-selection screen, a pure Rust geometry/transaction core, and
+version-pinned package metadata. The native screen can open, render, select
+Floor/Wall/Pillar/Cube and close while capturing clicks inside its panel.
+It does not yet select world positions, preview blocks in-world, or modify
+the game world.
 
 ## Implemented in the pure Rust core
 
-- Filled floor, cuboid, wall, circle, cylinder, sphere, square pyramid, cone and upper dome.
+- Filled floor, cuboid, wall, circle, cylinder, sphere, square pyramid, cone,
+  upper dome, and line geometry.
 - Bounded geometry generation and checked coordinate conversion.
-- Undo transaction ordering with repeated-position coalescing.
-- Chunk-aware batch grouping, including negative world coordinates.
-- Deterministic preview sampling with a hard point cap.
+- Chunk-aware run grouping, including negative world coordinates.
+- Column snapshot decoding with strict palette, range and unloaded-column
+  rejection.
+- Snapshot-gated placement planning; missing or duplicate snapshot entries
+  fail closed.
+- Guarded undo/redo planning that rejects stale world state rather than
+  overwriting later player edits.
+- Deterministic capped preview sampling.
+- A confirmation session that keeps preview separate from commit intent and
+  consumes a confirmation only once.
 
-These routines do not access the game world. The preview sampler is not a placement list, and the undo planner is not connected to live world snapshots yet.
+These are pure planning routines. They do not themselves read or modify the
+live game world.
 
-## Compatibility status
+## Starling 0.9.0 integration
 
-Starling v0.9.0 still accepts native .hnmod bundles. Its build pipeline uses a newer global horizon-mixins pin and includes an adapter for older hook targets. The old 0.8.0 pins in this repository are historical and are not presented as 0.9.0-compatible. The exact public build-service route for this project's bundle is still being verified.
+The native bundle manifest and legacy `.hnmod` source layout follow the
+v0.9.0 importer contract. The native hook scaffold is adapted against the
+pinned source and is being validated by GitHub Actions.
 
-See the 0.9.0 compatibility audit in docs/STARLING-0.9.0-COMPATIBILITY-AUDIT.md and porting status in docs/PORTING-STATUS.md.
+Starling 0.9.0 exposes an authoritative server-side bulk block-edit path and
+bounded column snapshot reads. The required safety contract is documented in
+[docs/WORLD-EDIT-ADAPTER-CONTRACT.md](docs/WORLD-EDIT-ADAPTER-CONTRACT.md).
+The adapter that connects those engine APIs to this mod is not implemented
+yet. Client-side/remote multiplayer edits, implicit chunk loading, and
+block-entity NBT preservation are explicitly out of scope for the first safe
+implementation.
 
-## Not yet implemented
+## Not yet implemented or verified
 
-- Executable v0.9.0 native hook declarations and world read/write adapter.
-- Native screen, touch-input isolation and mobile controls integration.
-- Inventory accounting and authoritative Unlimited Blocks behavior.
-- Live world snapshots, undo/redo persistence and conflict checks.
-- Final .hnmod package, build-service compilation and in-game tests.
+- Live world-coordinate selection and in-world preview markers.
+- Live world snapshot and block-edit adapter.
+- Placement commit, conflict-aware live undo/redo and persistent history.
+- Inventory consumption and authoritative Unlimited Blocks behavior.
+- Runtime testing in Starling 0.9.0 on Android/POCO F5.
+- A final phone-importable `.hnmod` package.
 
-See the world-edit adapter contract in docs/WORLD-EDIT-ADAPTER-CONTRACT.md, porting status in docs/PORTING-STATUS.md and license notice in LICENSE-NOTICE.md.
+See [docs/PORTING-STATUS.md](docs/PORTING-STATUS.md),
+[docs/STARLING-0.9.0-COMPATIBILITY-AUDIT.md](docs/STARLING-0.9.0-COMPATIBILITY-AUDIT.md),
+and [docs/WORLD-EDIT-ADAPTER-CONTRACT.md](docs/WORLD-EDIT-ADAPTER-CONTRACT.md).
