@@ -56,3 +56,10 @@ A successful package ZIP workflow only proves archive generation and its local s
 
 The 0.9.0 source audit also confirmed the supported server-side edit path and column snapshot API. The world-edit adapter contract was rewritten against those exact 0.9.0 sources; it no longer describes the obsolete 0.8.0 helper names or run layout. The actual mod adapter remains unimplemented.
 
+
+
+## Latest package and ARM64 retry (2026-11-21)
+
+The source-package workflow [44878280192](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44878280192) completed successfully. Artifact `effortless_building-0.1.0-hnmod` was downloaded and inspected locally. The outer Actions ZIP contains the `.hnmod`; the inner archive contains `horizon-native.json`, the mixin manifest, all three module sources and all nine helper sources. Both archive integrity checks pass. This is a source-package structural validation only.
+
+The latest ARM64 retry is [44878280143](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44878280143). At the latest status check it had completed source checkout, exact Starling 0.9.0 revision verification and Android SDK setup; Rust Android toolchain installation was still running. No ARM64 library artifact has been produced by this retry yet.
