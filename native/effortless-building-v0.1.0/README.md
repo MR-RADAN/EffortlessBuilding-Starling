@@ -10,7 +10,7 @@ Pinned Horizon SDK build: `4dc6455d4a6773224792eb1f121a9b939dff3170`
 
 - Registers in the native Mods list and exposes Floor, Wall, Pillar and Cube.
 - Opens a dedicated builder screen with tool selection and a Close action.
-- Captures the main-hand block use only while holding a stick and only on the local game window. First use records point A, second records B, and third starts a new pair.
+- Captures the main-hand block use only while holding a stick and only for the local window player. Delegated LAN actors are excluded because the current selection store is process-global; this prevents different players from sharing or overwriting selection points. First use records point A, second records B, and third starts a new pair.
 - Uses Starling's own block ray-pick result; other held items retain normal use behavior.
 - Draws a read-only selection wireframe and up to 64 spatially distributed sample crosses.
 - Reports the geometric target-position count and warns when the selection exceeds the core's 8,192-position limit.
