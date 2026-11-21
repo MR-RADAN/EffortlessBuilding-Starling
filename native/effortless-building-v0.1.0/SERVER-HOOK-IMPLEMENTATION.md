@@ -106,3 +106,17 @@ read-only planning pass. Unlimited mode means no inventory lookup or
 consumption; it does not mean unbounded work. Placement remains disabled
 until target validation, confirmation, and safe bounded application are
 implemented and compile-checked.
+
+
+## Bounded target planner milestone
+
+The core runtime now has a pure `plan_target_positions` helper. It derives
+unique coordinates for Floor, Wall, Pillar, and Cube selections in stable
+X/Y/Z order, computes the target count before allocating, and rejects
+incomplete selections, invalid tools, and any plan above 8,192 positions.
+The helper is read-only: it does not inspect chunks, resolve block states,
+or mutate the world. The 4,096 large-build warning remains a UI concern.
+
+This is a planning milestone only. World-boundary/chunk-loaded checks,
+replacement-state validation, explicit confirmation, batched writes, and
+undo bookkeeping are not implemented. No placement is enabled.
