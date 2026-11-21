@@ -174,7 +174,6 @@ static PREFLIGHT_STATUS: Mutex<String> = Mutex::new(String::new());
 pub fn preflight_status() -> String {
     PREFLIGHT_STATUS.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
-static CAPTURED_LEFT_PRESS: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct UiLayout {
@@ -280,14 +279,6 @@ pub fn queue_ui_action(action: i32) {
     }
 }
 
-pub fn capture_left_press() {
-    CAPTURED_LEFT_PRESS.store(true, Ordering::Release);
-}
-
-pub fn release_captured_left_press() -> bool {
-    CAPTURED_LEFT_PRESS.swap(false, Ordering::AcqRel)
-}
-
 /// Apply UI intent only on the window's Game instance, never on the server tick.
 pub fn process_pending_ui_action(game: &mut crate::game::Game<'_>) {
     if !game.native_window() {
@@ -307,7 +298,6 @@ pub fn process_pending_ui_action(game: &mut crate::game::Game<'_>) {
         }
         ACTION_CLOSE => {
             game.native_mod_screen_close(ID);
-            CAPTURED_LEFT_PRESS.store(false, Ordering::Release);
         }
         _ => {}
     }
