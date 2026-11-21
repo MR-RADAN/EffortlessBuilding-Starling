@@ -219,7 +219,6 @@ pub fn process_pending_ui_action(game: &mut crate::game::Game<'_>) {
         }
         ACTION_CLEAR => {
             clear_selection_points();
-            game.native_set_setting(ID, "selection_reset", "");
         }
         ACTION_CLOSE => {
             game.native_mod_screen_close(ID);
