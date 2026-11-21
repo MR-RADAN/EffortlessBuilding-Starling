@@ -19,7 +19,7 @@ permissions:
 # A push to a branch with an open PR otherwise runs this expensive pinned
 # SDK install twice. Share the concurrency key between push and PR events.
 concurrency:
-  group: native-sdk-check-${{ github.event.pull_request.head.ref || github.ref }}
+  group: native-sdk-check-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
