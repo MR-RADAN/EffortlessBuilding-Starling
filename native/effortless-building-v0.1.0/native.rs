@@ -4,6 +4,13 @@
 use super::{Game, GuestUse};
 use horizon_client::first_person::Hand;
 
+std::thread_local! {
+    // Reuse the preview batch between frames; the geometry renderer also owns
+    // fixed-capacity per-view storage, so this avoids a per-frame heap alloc.
+    static PREVIEW_LINES: std::cell::RefCell<Vec<crate::mod_api::WorldLine>> =
+        std::cell::RefCell::new(Vec::with_capacity(204));
+}
+
 impl Game<'_> {
     /// Capture a main-hand block use as one corner of the build selection.
     /// Guests connected to another server are deliberately not intercepted.
@@ -93,7 +100,9 @@ impl Game<'_> {
             (2, 6), (3, 7), (4, 5), (4, 6), (5, 7), (6, 7),
         ];
         let world = |p: [i32; 3]| [f64::from(p[0]), f64::from(p[1]), f64::from(p[2])];
-        let mut lines = Vec::with_capacity(12 + 64 * 3);
+        PREVIEW_LINES.with(|buffer| {
+            let mut lines = buffer.borrow_mut();
+            lines.clear();
         for (from, to) in EDGES {
             lines.push(WorldLine::new(
                 world(corners[from]),
@@ -145,6 +154,7 @@ impl Game<'_> {
         }
         // WorldGeometry validates the whole batch atomically and enforces its
         // fixed per-view line capacity. A refusal draws nothing from this batch.
-        let _ = draw.lines(&lines);
-    }
+
+            let _ = draw.lines(&lines);
+        });    }
 }
