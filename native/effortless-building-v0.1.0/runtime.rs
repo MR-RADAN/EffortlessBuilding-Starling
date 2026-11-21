@@ -13,6 +13,7 @@ pub const DESCRIPTION: &str =
 
 pub const TOOLS: [&str; 4] = ["Floor", "Wall", "Pillar", "Cube"];
 pub const ACTION_CLOSE: i32 = 4;
+pub const ACTION_CLEAR: i32 = 5;
 pub const SELECTION_ITEM: &str = "minecraft:stick";
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -108,6 +109,7 @@ static CAPTURED_LEFT_PRESS: AtomicBool = AtomicBool::new(false);
 pub struct UiLayout {
     pub panel: [f32; 4],
     pub tools: [[f32; 4]; 4],
+    pub clear: [f32; 4],
     pub close: [f32; 4],
     pub footer_y: f32,
 }
@@ -154,6 +156,7 @@ pub fn ui_layout(rect: [f32; 4]) -> UiLayout {
     let button_h = 34.0 * scale;
     let left = panel_x + 14.0;
     let right = left + button_w + 8.0;
+    let action_w = ((panel_w - 36.0) * 0.5).max(0.0);
 
     UiLayout {
         panel: [panel_x, panel_y, panel_w, panel_h],
@@ -163,12 +166,8 @@ pub fn ui_layout(rect: [f32; 4]) -> UiLayout {
             [left, panel_y + 110.0 * scale, button_w, button_h],
             [right, panel_y + 110.0 * scale, button_w, button_h],
         ],
-        close: [
-            panel_x + 14.0,
-            panel_y + 156.0 * scale,
-            (panel_w - 28.0).max(0.0),
-            button_h,
-        ],
+        clear: [panel_x + 14.0, panel_y + 156.0 * scale, action_w, button_h],
+        close: [panel_x + 22.0 + action_w, panel_y + 156.0 * scale, action_w, button_h],
         footer_y: panel_y + 202.0 * scale,
     }
 }
@@ -187,11 +186,15 @@ pub fn ui_action_at(layout: &UiLayout, point: [f32; 2]) -> Option<i32> {
             return Some(index as i32);
         }
     }
-    contains(layout.close, point).then_some(ACTION_CLOSE)
+    if contains(layout.clear, point) {
+        Some(ACTION_CLEAR)
+    } else {
+        contains(layout.close, point).then_some(ACTION_CLOSE)
+    }
 }
 
 pub fn queue_ui_action(action: i32) {
-    if (0..=ACTION_CLOSE).contains(&action) {
+    if (0..=ACTION_CLEAR).contains(&action) {
         PENDING_UI_ACTION.store(action, Ordering::Release);
     }
 }
@@ -213,6 +216,9 @@ pub fn process_pending_ui_action(game: &mut crate::game::Game<'_>) {
     match PENDING_UI_ACTION.swap(NO_ACTION, Ordering::AcqRel) {
         action if (0..TOOLS.len() as i32).contains(&action) => {
             game.native_set_setting(ID, "tool", &action.to_string());
+        }
+        ACTION_CLEAR => {
+            clear_selection_points();
         }
         ACTION_CLOSE => {
             game.native_mod_screen_close(ID);
@@ -261,6 +267,18 @@ pub fn draw_screen(
         let ty = rect[1] + (rect[3] - 9.0) * 0.5;
         game.native_text(batch, &label, [tx, ty], 0xFFFFFF, true);
     }
+
+    game.native_fill(batch, layout.clear, 0xFF795A2E);
+    let clear_label = "Clear";
+    let clear_x = layout.clear[0]
+        + (layout.clear[2] - game.native_text_width(clear_label)) * 0.5;
+    game.native_text(
+        batch,
+        clear_label,
+        [clear_x, layout.clear[1] + (layout.clear[3] - 9.0) * 0.5],
+        0xFFFFFF,
+        true,
+    );
 
     game.native_fill(batch, layout.close, 0xFF613B43);
     let close_label = "Close";
@@ -311,7 +329,7 @@ mod tests {
     fn layout_places_all_buttons_inside_the_panel() {
         let layout = ui_layout([0.0, 0.0, 854.0, 480.0]);
         assert!(layout.panel[0] >= 0.0 && layout.panel[1] >= 0.0);
-        for rect in layout.tools.into_iter().chain([layout.close]) {
+        for rect in layout.tools.into_iter().chain([layout.clear, layout.close]) {
             assert!(rect[0] >= layout.panel[0]);
             assert!(rect[1] >= layout.panel[1]);
             assert!(rect[0] + rect[2] <= layout.panel[0] + layout.panel[2]);
@@ -324,8 +342,10 @@ mod tests {
         let layout = ui_layout([0.0, 0.0, 854.0, 480.0]);
         let center = |r: [f32; 4]| [r[0] + r[2] * 0.5, r[1] + r[3] * 0.5];
         assert_eq!(ui_action_at(&layout, center(layout.tools[2])), Some(2));
+        assert_eq!(ui_action_at(&layout, center(layout.clear)), Some(ACTION_CLEAR));
         assert_eq!(ui_action_at(&layout, center(layout.close)), Some(ACTION_CLOSE));
         assert_eq!(ui_action_at(&layout, [0.0, 0.0]), None);
+        assert!(layout.clear[0] + layout.clear[2] <= layout.close[0]);
     }
 }
 
@@ -373,5 +393,21 @@ mod selection_count_tests {
             selection_block_count_for(selection, 3),
             Some(1u128 << 96)
         );
+    }
+}
+
+ 
+#[cfg(test)]
+mod selection_reset_tests {
+    use super::*;
+
+    #[test]
+    fn clear_selection_removes_both_corners() {
+        record_selection_point([3, 4, 5]);
+        record_selection_point([8, 9, 10]);
+        assert!(selection_points().first.is_some());
+        assert!(selection_points().second.is_some());
+        clear_selection_points();
+        assert_eq!(selection_points(), SelectionPoints::default());
     }
 }
