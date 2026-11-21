@@ -86,8 +86,8 @@ impl Game<'_> {
                 let plan = eb::plan_target_positions(selection, tool).ok()?;
                 *cache = Some((selection, tool, plan));
             }
-            cache.as_ref().map(|(_, _, plan)| !plan.is_empty()).unwrap_or(false)
-        });
+            Some(cache.as_ref().map(|(_, _, plan)| !plan.is_empty()).unwrap_or(false))
+        }).unwrap_or(false);
         if !valid {
             return;
         }
