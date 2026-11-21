@@ -402,7 +402,7 @@ pub fn plan_snapshot_transaction(
 }
 
 #[cfg(test)]
-mod snapshot_transaction_tests {
+mod snapshot_noop_filter_tests {
     use super::*;
 
     #[test]
