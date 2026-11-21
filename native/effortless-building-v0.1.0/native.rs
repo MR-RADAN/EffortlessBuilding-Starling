@@ -16,6 +16,25 @@ std::thread_local! {
         std::cell::RefCell::new(None);
 }
 
+
+/// One fully validated, read-only target snapshot from the active local world.
+/// Kept in the native mixin layer because BlockStateId is an engine type.
+pub(super) struct NativePreflightBlock {
+    pub pos: [i32; 3],
+    pub before_state: horizon_world::registry::BlockStateId,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum NativePreflightError {
+    NotAuthoritativePlayer,
+    InvalidPlan,
+    OutsideHeight { index: usize },
+    UnloadedChunk { index: usize },
+    OutsideBorder { index: usize },
+    OutOfReach { index: usize },
+    UnresolvedState { index: usize },
+}
+
 impl Game<'_> {
     /// Capture a main-hand block use as one corner of the build selection.
     /// Guests connected to another server are deliberately not intercepted.
@@ -61,6 +80,59 @@ impl Game<'_> {
     }
 }
 
+
+impl Game<'_> {
+    /// Collects a complete read-only preflight snapshot for the frozen target
+    /// list. It never loads chunks, yields, consumes inventory, or mutates.
+    /// Call again after confirmation before any future write phase.
+    pub(super) fn effortless_building_preflight(
+        &self,
+        targets: &[[i32; 3]],
+    ) -> Result<Vec<NativePreflightBlock>, NativePreflightError> {
+        if self.remote.is_some()
+            || self.player.is_none()
+            || self.spectator()
+            || (self.lan_acting.is_none() && !self.native_window())
+        {
+            return Err(NativePreflightError::NotAuthoritativePlayer);
+        }
+        if targets.is_empty() || targets.len() > 8_192 {
+            return Err(NativePreflightError::InvalidPlan);
+        }
+
+        let layout = self.world.layout();
+        let reach = self.reach() + 1.0;
+        let eye = self.eye_position();
+        let mut snapshot = Vec::with_capacity(targets.len());
+        for (index, pos) in targets.iter().copied().enumerate() {
+            if pos[1] < layout.min_y() || pos[1] >= layout.max_y() {
+                return Err(NativePreflightError::OutsideHeight { index });
+            }
+            if !self.world.loaded(pos[0], pos[2]) {
+                return Err(NativePreflightError::UnloadedChunk { index });
+            }
+            if !self.border.contains(f64::from(pos[0]), f64::from(pos[2])) {
+                return Err(NativePreflightError::OutsideBorder { index });
+            }
+            let reachable = eye.is_some_and(|eye| {
+                let distance_squared: f64 = (0..3)
+                    .map(|axis| (f64::from(pos[axis]) + 0.5 - eye[axis]).powi(2))
+                    .sum();
+                distance_squared <= reach * reach
+            });
+            if !reachable {
+                return Err(NativePreflightError::OutOfReach { index });
+            }
+
+            let state = self.world.block(pos[0], pos[1], pos[2]);
+            if self.pack.assets.registry.state(state).is_none() {
+                return Err(NativePreflightError::UnresolvedState { index });
+            }
+            snapshot.push(NativePreflightBlock { pos, before_state: state });
+        }
+        Ok(snapshot)
+    }
+}
 
 impl Game<'_> {
     /// Draw the exact bounded planner geometry. The cached plan is rebuilt
