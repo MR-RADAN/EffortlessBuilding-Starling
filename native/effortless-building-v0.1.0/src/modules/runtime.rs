@@ -316,6 +316,10 @@ pub fn queue_ui_action(action: i32) {
 /// Apply UI intent only on the window's Game instance, never on the server tick.
 pub fn process_pending_ui_action(game: &mut crate::game::Game<'_>) {
     if !game.native_window() {
+        // Discard taps queued for a screen that has already closed. Keeping
+        // them would let an old click execute when the builder is reopened.
+        PENDING_UI_ACTION.store(NO_ACTION, Ordering::Release);
+        clear_preflight_status();
         return;
     }
 
