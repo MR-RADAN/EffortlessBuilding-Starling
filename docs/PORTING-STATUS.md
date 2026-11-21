@@ -53,7 +53,8 @@ Historical 0.8.0 build and pin information is retained in
 - The 0.9.0 adapter has rewritten all nine hook targets, including `use_item`
   and `submit_custom_geometry`; the first compile attempt then caught a duplicate
   module/injection ID before Rust compilation. The injection ID is now
-  `world_preview`; the corrected ARM64 build is queued/running through its compile step.
+  `world_preview`. The ARM64 workflow retry on commit `e715948` is in progress;
+  it has not yet compiled the newer action-bar feedback commit.
 
 ## Starling 0.9.0 source audit
 
@@ -131,3 +132,21 @@ Verified directly against the pinned source:
    server-side behavior; no multiplayer client bypass.
 8. The custom screen must not interfere with Starling, MCPE or GoyControl
    touch layouts.
+
+
+## Selection-input diagnostic update
+
+The current `Game::use_item` mixin now sends an action-bar message immediately
+after it captures a point, using the same local/LAN overlay path as Starling's
+Wrench mod. This makes the two-click selection observable on a phone instead
+of relying only on the preview. It does not implement block placement.
+
+Important integration boundary: the public `ServerHost` methods
+(`surface_heights`, `read_columns`, `edit_blocks`) are available to a real
+Horizon `#[horizon_mod]` hook implementation. They are not callable directly
+from this legacy `horizon-mixins` `Game` injection. The current `.hnmod` is
+a mixin bundle. A future adapter must either be a separately packaged Horizon
+mod crate with a supported shared request channel, or use the acting
+single-player/LAN `Game` world path (as Starling's Wrench does) with strict
+preflight and rollback safeguards. Do not claim that adding a
+`ServerHost`-shaped helper to a mixin gives it server-host access.
