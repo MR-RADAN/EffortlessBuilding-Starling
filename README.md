@@ -56,7 +56,7 @@ implementation.
 
 ## Not yet implemented or verified
 
-- In-world preview markers and live world snapshot/block-edit adapter.
+- Actual ghost-block previews, live world snapshot/block-edit adapter and commit.
 - Live world snapshot and block-edit adapter.
 - Placement commit, conflict-aware live undo/redo and persistent history.
 - Inventory consumption and authoritative Unlimited Blocks behavior.
