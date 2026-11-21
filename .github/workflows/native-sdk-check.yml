@@ -45,8 +45,16 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
+      - name: Cache pinned SDK build dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            starling-source/crates/cargo-horizon-mod -> starling-source/crates/cargo-horizon-mod/target
+
       - name: Install pinned cargo-horizon-mod CLI
-        run: cargo install --path starling-source/crates/cargo-horizon-mod --locked
+        # The CLI is a build-time validator/packager, not a shipped runtime
+        # binary; a debug install avoids an expensive release/LTO build.
+        run: cargo install --debug --path starling-source/crates/cargo-horizon-mod --locked
 
       - name: Validate declared helper files and Rust syntax
         working-directory: native/effortless-building-v0.1.0
