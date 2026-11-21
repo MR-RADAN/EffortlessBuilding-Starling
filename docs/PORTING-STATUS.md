@@ -5,7 +5,7 @@
 - Horizon: ac874422ed8f892505ff73d67ae486ecfee7a516
 - horizon-mixins: ddd9700b21997c95d95ac6ee5ecafe3830cf622a
 
-These pins describe the old 0.8.0 target only. They are not the v0.9.0 build pins.
+These are historical 0.8.0 pins only. The current target pins are recorded in VERSION.json and the native bundle manifests.
 
 ## Implemented source core
 - Deterministic geometry: line, wall, floor, cuboid, circle, cylinder, sphere, pyramid, cone and dome.
@@ -15,6 +15,12 @@ These pins describe the old 0.8.0 target only. They are not the v0.9.0 build pin
 - Deterministic capped preview sampling.
 - Checked dimension multiplication for cuboids, floors and walls; wall Y-coordinate overflow is rejected before generation.
 - Regression tests added for extreme coordinate ranges and wall-height overflow (not executed in this environment).
+
+## Current Starling 0.9.0 target pins
+- Horizon/Starling source: ff303502a4f7982551a0e0d3622d9268efe9e829.
+- Global horizon-mixins: 5a64af938ec86b00d53d16a408aabc0038fb3e57.
+- VERSION.json, horizon-native.json and horizon-mixin.toml have been updated consistently.
+- Legacy .hnmod import requires strict horizon-native.json fields including both exact horizon and mixins revisions; identity and horizon revision must match horizon-mixin.toml.
 
 ## Confirmed Starling 0.9.0 source facts
 - Official tag: v0.9.0.
@@ -35,9 +41,9 @@ See the corrected compatibility audit in STARLING-0.9.0-COMPATIBILITY-AUDIT.md.
 - No world read/write adapter exists.
 - No inventory consumption or Unlimited Blocks implementation exists.
 - No server-authority or multiplayer behavior has been tested.
-- No .hnmod package has been produced.
+- A source bundle scaffold and deterministic .hnmod packager exist, but the updated v0.9.0 package has not been produced or imported.
 - Rust tests and Cargo checks have not run here because Rust/Cargo are unavailable. The latest overflow-regression tests are committed but remain unexecuted.
-- The v0.9.0 native bundle importer/build-service route for this project's own bundle has not yet been exercised.
+- The v0.9.0 native bundle importer/build-service route for this project's own bundle has not yet been exercised. The default gateway URL is published in Starling source, but its server-side version registry is not public; the public GitHub-runner map still lists only 0.8.0.
 
 ## Adapter safety requirements
 1. Preview must be read-only.
