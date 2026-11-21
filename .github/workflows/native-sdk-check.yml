@@ -1,4 +1,4 @@
-name: Validate native mod against Starling 0.9.0 SDK
+name: Check native mod bundle and pinned SDK
 
 on:
   pull_request:
@@ -36,6 +36,32 @@ jobs:
       - name: Install pinned cargo-horizon-mod CLI
         run: cargo install --path starling-source/crates/cargo-horizon-mod --locked
 
-      - name: Validate the native mod package, SDK and Rust source
+      - name: Validate declared helper files and Rust syntax
+        working-directory: native/effortless-building-v0.1.0
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import tomllib
+
+          root = pathlib.Path(".")
+          manifest = tomllib.loads((root / "horizon-mod.toml").read_text())
+          native = manifest["native"]
+          declared = [row["source"] for row in native.get("module", [])]
+          declared += [row["helper"] for row in native.get("mixin", [])]
+          if not declared:
+              raise SystemExit("manifest declares no native helper sources")
+          for name in declared:
+              path = root / name
+              if not path.is_file():
+                  raise SystemExit(f"missing declared native source: {name}")
+              print(f"Rust syntax: {name}")
+              import subprocess
+              subprocess.run(
+                  ["rustfmt", "--edition", "2024", "--emit", "stdout", str(path)],
+                  check=True, stdout=subprocess.DEVNULL,
+              )
+          PY
+
+      - name: Verify signed SDK pin and check mod crate
         working-directory: native/effortless-building-v0.1.0
         run: cargo horizon-mod check
