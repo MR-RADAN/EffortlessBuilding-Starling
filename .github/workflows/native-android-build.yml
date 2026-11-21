@@ -54,6 +54,7 @@ jobs:
         run: |
           rustup toolchain install stable --profile minimal --target aarch64-linux-android
           rustup default stable
+          rustup component add rust-src
           cargo install cargo-ndk --version 3.5.4 --locked
 
       - name: Make room for the native release build
