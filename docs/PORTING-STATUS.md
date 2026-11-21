@@ -73,15 +73,16 @@ Verified directly against the pinned source:
   0.9.0 source locations) and brought all three project modules up to date.
   It then stopped at manifest validation because module and injection IDs
   collided; the injection has since been renamed.
-- Starling 0.9.0 provides an authoritative server-side typed bulk edit path
-  (`edit_blocks`), bounded column snapshot reads (`read_columns`), and
-  loaded-column height queries. These operate only on the level being ticked;
-  remote client edits are refused.
-- Column reads are limited to 1,048,576 block positions per call and do not
-  load missing chunks. Bulk edits can skip unloaded chunks and do not preserve
-  arbitrary block-entity NBT.
-- The exact API constraints and transaction safeguards are documented in
-  `docs/WORLD-EDIT-ADAPTER-CONTRACT.md`.
+- The built-in Wrench mod is the verified reference for this legacy mixin
+  package: it mutates the acting local single-player/LAN-host world through
+  `Game::with_level` and block behaviour methods, while rejecting remote
+  clients. The project must follow this route rather than inventing a
+  `ServerHost` callback inside a `Game<'_>` mixin.
+- Wrench's single-block `set_block` / `destroy_block` examples prove the
+  callable integration pattern, not bulk atomicity, rollback, or block-entity
+  preservation. Those safeguards remain implementation requirements.
+- The corrected adapter boundary and transaction requirements are documented
+  in `docs/WORLD-EDIT-ADAPTER-CONTRACT.md`.
 
 ## Build validation
 
@@ -147,12 +148,11 @@ after it captures a point, using the same local/LAN overlay path as Starling's
 Wrench mod. This makes the two-click selection observable on a phone instead
 of relying only on the preview. It does not implement block placement.
 
-Important integration boundary: the public `ServerHost` methods
-(`surface_heights`, `read_columns`, `edit_blocks`) are available to a real
-Horizon `#[horizon_mod]` hook implementation. They are not callable directly
-from this legacy `horizon-mixins` `Game` injection. The current `.hnmod` is
-a mixin bundle. A future adapter must either be a separately packaged Horizon
-mod crate with a supported shared request channel, or use the acting
-single-player/LAN `Game` world path (as Starling's Wrench does) with strict
-preflight and rollback safeguards. Do not claim that adding a
-`ServerHost`-shaped helper to a mixin gives it server-host access.
+Important integration boundary: this legacy `.hnmod` is a `horizon-mixins`
+bundle, not a `#[horizon_mod]` crate. The verified world-write pattern for
+this package is Starling's built-in Wrench implementation: its cancellable
+`Game::use_item` path checks the acting local/LAN-host context and uses
+`Game::with_level` plus the behaviour API. The project's bulk adapter must
+extend that exact pattern with complete preflight, snapshots, explicit user
+confirmation, guarded partial-failure recovery, and conflict-safe history.
+Do not add fake `ServerHost` parameters or claim atomic transactions.
