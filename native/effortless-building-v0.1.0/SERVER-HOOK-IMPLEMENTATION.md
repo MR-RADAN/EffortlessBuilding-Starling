@@ -66,9 +66,7 @@ Before enabling bulk placement, the adapter must:
 
 The native registry path exposes `Game::item_block(ItemKey) -> Option<BlockKey>` and `Game::block_state_default(BlockKey) -> Option<BlockStateId>` in Starling 0.9.0. These establish a registry-backed route from a held block item to its default block state, including special item-to-block bindings such as seeds to crops. They are currently private to Starling's modding implementation and have not yet been proven callable from this mixin module; do not duplicate or guess their internal mapping. Confirm visibility or use a supported registry/behaviour binding before wiring material selection.\n\nThe engine API may trigger neighbour updates and block behaviour side effects.
 A block entity's NBT, inventories, scheduled ticks, and arbitrary side effects
-must not be claimed as preserved unless separately proven. Survival inventory
-consumption and unlimited-block mode remain disabled until a verified item
-accounting path is implemented.
+must not be claimed as preserved unless separately proven. Inventory accounting is intentionally out of scope for the selected unlimited-block mode: placement must not require or consume an inventory stack. This does not remove the world-edit safety limits or authorize writes before validation and confirmation.
 
 ## Held-item resolver investigation
 
@@ -85,3 +83,26 @@ and material-selection flow. The ARM64 native build compiles the mixin bundle
 into Starling's Android library; a successful compile alone is not proof of
 in-game functionality. Device testing on Starling 0.9.0 is still required.
 \n\n## Current verification update\n\nThe core test workflow passed on the current `main` revision (54 tests). The native integration remains a separate compile-and-device-test gate: no block writes are enabled in this revision.\n
+
+## Pinned-revision API check — unlimited placement
+
+The pinned Horizon revision contains a bulk API, but it is not callable from
+this legacy client mixin route:
+
+- `Game::edit_blocks` is a server-side helper for the authoritative level
+  being ticked.
+- Its public mod-facing counterpart is `WorldEditServerHost::edit_blocks`,
+  declared with `#[access(WorldOnly)]` and reached through `ServerHost`.
+- The current `.hnmod` mixin is injected into client `Game<'_>`; it does not
+  receive a `ServerHost`. Calling this API here would cross the wrong
+  authority boundary and must not be attempted.
+- Horizon's bulk helper also has different limits and run semantics; it does
+  not replace this project's 8,192-unique-position cap or the required
+  explicit confirmation.
+
+Accordingly, the local single-player/LAN-host mixin must use the verified
+Wrench-style `with_level` + `Behaviours::set_block` route, after a complete
+read-only planning pass. Unlimited mode means no inventory lookup or
+consumption; it does not mean unbounded work. Placement remains disabled
+until target validation, confirmation, and safe bounded application are
+implemented and compile-checked.
