@@ -52,7 +52,7 @@ pub(super) enum NativePreflightError {
     OutsideHeight { index: usize },
     UnloadedChunk { index: usize },
     OutsideBorder { index: usize },
-    OutOfReach { index: usize },
+    NoSelectionCornerInReach,
     UnresolvedState { index: usize },
 }
 
@@ -146,6 +146,25 @@ impl Game<'_> {
         let layout = self.world.layout();
         let reach = self.reach() + 1.0;
         let eye = self.eye_position();
+        // A and B are selected by the player's ray pick. At preflight time the
+        // player may have walked from A to B, so require at least one corner
+        // to remain in reach rather than incorrectly requiring every target
+        // block in a large cuboid to be within arm's reach.
+        let corner_reachable = |pos: [i32; 3]| {
+            eye.is_some_and(|eye| {
+                let distance_squared: f64 = (0..3)
+                    .map(|axis| (f64::from(pos[axis]) + 0.5 - eye[axis]).powi(2))
+                    .sum();
+                distance_squared <= reach * reach
+            })
+        };
+        if ![selection.first, selection.second]
+            .into_iter()
+            .flatten()
+            .any(corner_reachable)
+        {
+            return Err(NativePreflightError::NoSelectionCornerInReach);
+        }
         let mut snapshot = Vec::with_capacity(targets.len());
         for (index, pos) in targets.iter().copied().enumerate() {
             if pos[1] < layout.min_y() || pos[1] >= layout.max_y() {
@@ -157,16 +176,6 @@ impl Game<'_> {
             if !self.border.contains(f64::from(pos[0]), f64::from(pos[2])) {
                 return Err(NativePreflightError::OutsideBorder { index });
             }
-            let reachable = eye.is_some_and(|eye| {
-                let distance_squared: f64 = (0..3)
-                    .map(|axis| (f64::from(pos[axis]) + 0.5 - eye[axis]).powi(2))
-                    .sum();
-                distance_squared <= reach * reach
-            });
-            if !reachable {
-                return Err(NativePreflightError::OutOfReach { index });
-            }
-
             let state_id = self.world.block(pos[0], pos[1], pos[2]);
             if self.pack.assets.registry.state(state_id).is_none() {
                 return Err(NativePreflightError::UnresolvedState { index });
@@ -210,6 +219,21 @@ impl Game<'_> {
         let layout = self.world.layout();
         let reach = self.reach() + 1.0;
         let eye = self.eye_position();
+        let corner_reachable = |pos: [i32; 3]| {
+            eye.is_some_and(|eye| {
+                let distance_squared: f64 = (0..3)
+                    .map(|axis| (f64::from(pos[axis]) + 0.5 - eye[axis]).powi(2))
+                    .sum();
+                distance_squared <= reach * reach
+            })
+        };
+        if ![plan.selection.first, plan.selection.second]
+            .into_iter()
+            .flatten()
+            .any(corner_reachable)
+        {
+            return false;
+        }
         for block in &plan.blocks {
             let [x, y, z] = block.pos;
             if y < layout.min_y()
@@ -219,18 +243,6 @@ impl Game<'_> {
             {
                 return false;
             }
-            let reachable = eye.is_some_and(|eye| {
-                let distance_squared: f64 = (0..3)
-                    .map(|axis| {
-                        (f64::from(block.pos[axis]) + 0.5 - eye[axis]).powi(2)
-                    })
-                    .sum();
-                distance_squared <= reach * reach
-            });
-            if !reachable {
-                return false;
-            }
-
             let current_state = self.world.block(x, y, z);
             if current_state != block.before_state
                 || self.pack.assets.registry.state(current_state).is_none()
