@@ -6,6 +6,7 @@ use super::{Game, GuestUse};
 use horizon_client::first_person::Hand;
 use horizon_client::text::Text;
 use horizon_protocol::packets::play::{self, Clientbound as C};
+use std::collections::BTreeSet;
 
 std::thread_local! {
     // Reuse both the bounded coordinate plan and line buffer across frames.
@@ -21,7 +22,7 @@ std::thread_local! {
 /// Kept in the native mixin layer because BlockStateId is an engine type.
 pub(super) struct NativePreflightBlock {
     pub pos: [i32; 3],
-    pub before_state: horizon_world::registry::BlockStateId,
+    pub before_state: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -82,13 +83,27 @@ impl Game<'_> {
 
 
 impl Game<'_> {
-    /// Collects a complete read-only preflight snapshot for the frozen target
-    /// list. It never loads chunks, yields, consumes inventory, or mutates.
-    /// Call again after confirmation before any future write phase.
-    pub(super) fn effortless_building_preflight(
+    /// Build the frozen target list from the current selection/tool and collect
+    /// its complete read-only snapshot. Call again after confirmation before
+    /// any future write phase. Arbitrary caller-supplied target lists are not accepted.
+    pub(super) fn effortless_building_preflight_selection(
         &self,
-        targets: &[[i32; 3]],
     ) -> Result<Vec<NativePreflightBlock>, NativePreflightError> {
+        use crate::game::effortless_building as eb;
+
+        let selection = eb::selection_points();
+        let tool = eb::selected_tool(|key| self.native_setting(eb::ID, key));
+        let targets = eb::plan_target_positions(selection, tool)
+            .map_err(|_| NativePreflightError::InvalidPlan)?;
+        if targets.is_empty() || targets.len() > 8_192 {
+            return Err(NativePreflightError::InvalidPlan);
+        }
+        // The planner is specified to emit unique positions in stable order;
+        // fail closed if that contract is ever broken.
+        let mut seen = BTreeSet::new();
+        if targets.iter().any(|pos| !seen.insert(*pos)) {
+            return Err(NativePreflightError::InvalidPlan);
+        }
         if self.remote.is_some()
             || self.player.is_none()
             || self.spectator()
@@ -96,10 +111,6 @@ impl Game<'_> {
         {
             return Err(NativePreflightError::NotAuthoritativePlayer);
         }
-        if targets.is_empty() || targets.len() > 8_192 {
-            return Err(NativePreflightError::InvalidPlan);
-        }
-
         let layout = self.world.layout();
         let reach = self.reach() + 1.0;
         let eye = self.eye_position();
@@ -124,11 +135,13 @@ impl Game<'_> {
                 return Err(NativePreflightError::OutOfReach { index });
             }
 
-            let state = self.world.block(pos[0], pos[1], pos[2]);
-            if self.pack.assets.registry.state(state).is_none() {
+            let state_id = self.world.block(pos[0], pos[1], pos[2]);
+            if self.pack.assets.registry.state(state_id).is_none() {
                 return Err(NativePreflightError::UnresolvedState { index });
             }
-            snapshot.push(NativePreflightBlock { pos, before_state: state });
+            // BlockStateId is a public tuple struct over u32 in the pinned
+            // Horizon revision; preserve its registry-local numeric identity.
+            snapshot.push(NativePreflightBlock { pos, before_state: state_id.0 });
         }
         Ok(snapshot)
     }
