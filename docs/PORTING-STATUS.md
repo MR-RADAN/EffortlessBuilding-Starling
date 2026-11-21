@@ -53,8 +53,9 @@ Historical 0.8.0 build and pin information is retained in
 - The 0.9.0 adapter has rewritten all nine hook targets, including `use_item`
   and `submit_custom_geometry`; the first compile attempt then caught a duplicate
   module/injection ID before Rust compilation. The injection ID is now
-  `world_preview`. The ARM64 workflow retry on commit `e715948` is in progress;
-  it has not yet compiled the newer action-bar feedback commit.
+  `world_preview`. The latest ARM64 workflow [44879334414](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44879334414)
+  is building commit `ec35bd7`, which includes the action-bar selection feedback
+  and corrected integration notes.
 
 ## Starling 0.9.0 source audit
 
@@ -101,11 +102,12 @@ Verified directly against the pinned source:
   with `E_DUPLICATE_ID` because the module and injection both used `preview`.
 - The injection ID was changed to `world_preview`. Corrected build
   [44877289336](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44877289336)
-  was cancelled before a result was produced. The current retry
-  [44878280143](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44878280143)
-  passed source pin verification, Android SDK setup, Rust Android toolchain setup
-  and disk preparation. At the latest check its ARM64 compile step was still
-  running; no compiled library artifact is available yet.
+  was cancelled before a result was produced. Retry [44878280143](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44878280143)
+  was cancelled before compilation completed. Run [44879000402](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44879000402)
+  was also superseded before compilation. Run [44879229267](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44879229267)
+  was cancelled by the subsequent bundle documentation update.
+  The latest retry is [44879334414](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44879334414);
+  no ARM64 library artifact has been produced yet.
 
 ## Not yet implemented or verified
 
@@ -116,7 +118,11 @@ Verified directly against the pinned source:
 - No block placement, wall/floor/cuboid commit, or shape commit is available.
 - No live undo/redo is connected to snapshots.
 - No inventory consumption or Unlimited Blocks implementation is available.
-- No runtime test on Starling 0.9.0 or POCO F5 has been completed.
+- The user confirmed that the mod imports/activates on Starling 0.9.0 and its
+  Options > Mods page shows the four tool selectors. However, the tools do not
+  perform their expected in-world actions yet. The new action-bar point-capture
+  feedback has not yet been tested on-device.
+- No end-to-end world-edit test on Starling 0.9.0 or POCO F5 has been completed.
 - No installable APK has been produced. The expected native build output is a
   Starling ARM64 library, not a standalone APK.
 
