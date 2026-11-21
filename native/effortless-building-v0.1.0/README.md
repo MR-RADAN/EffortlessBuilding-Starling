@@ -34,6 +34,16 @@ This is a Horizon Native SDK 0.2 flat native package. It is **not** the older St
 
 For SDK 0.2, the launcher compiles the native source package against the exact pinned Horizon build and links it with the matching prebuilt game. The game itself is not rebuilt for each mod. The resulting `.hmod` is source input, not an Android shared library and not directly installable as a finished APK.
 
+## Launcher integration test
+
+After installing the exact compatible Starling/Horizon build in a launcher instance, build this source folder through the SDK 0.2 native pipeline:
+
+```sh
+horizon-launcher native-build native/effortless-building-v0.1.0 --instance "<instance name>" --trust-native-code
+```
+
+The launcher performs the native compile/link against that instance's prebuilt game. Native code is unsandboxed and runs with the player's rights; only run a package whose source you have reviewed. A successful build is still not a substitute for checking the UI, selection lifecycle, preview rendering and safety behavior in a real world. World editing must remain disabled until the authoritative edit transaction is separately implemented and tested.
+
 ## What CI currently proves
 
 The `native-sdk-check` workflow successfully:
