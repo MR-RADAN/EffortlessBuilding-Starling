@@ -8,7 +8,21 @@
   "target": "Starling 0.9.0 / Horizon ARM64",
   "horizon_revision": "ff303502a4f7982551a0e0d3622d9268efe9e829",
   "horizon_mixins_revision": "5a64af938ec86b00d53d16a408aabc0038fb3e57",
-  "status": "source prototype; v0.9.0 pins updated; native build and in-game validation pending",
-  "implemented_core": ["line", "wall", "floor", "cuboid", "circle", "cylinder", "sphere", "pyramid", "cone", "dome", "bounded undo planning", "chunk-aware batches", "bounded preview sampling"],
-  "integration_status": "legacy native hook bundle scaffold exists; v0.9.0 build service, touch delivery, authoritative world edits, inventory handling and undo/redo remain unverified"
+  "status": "Starling 0.9.0 native UI scaffold and pure core implemented; Android ARM64 native compilation in CI; live world adapter and runtime validation pending",
+  "implemented_core": [
+    "line",
+    "wall",
+    "floor",
+    "cuboid",
+    "circle",
+    "cylinder",
+    "sphere",
+    "pyramid",
+    "cone",
+    "dome",
+    "bounded undo planning",
+    "chunk-aware batches",
+    "bounded preview sampling"
+  ],
+  "integration_status": "native bundle manifest, legacy hook declarations, tool-selection screen and click isolation are present; live coordinate selection, preview markers, authoritative world reads/writes, inventory handling and live undo/redo remain unimplemented"
 }
