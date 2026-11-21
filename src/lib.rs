@@ -389,12 +389,51 @@ pub fn plan_snapshot_transaction(
             continue;
         }
         let before_state = *before.get(&pos).ok_or(GeometryError::MissingSnapshot)?;
-        changes.push(BlockChange { pos, before_state, after_state });
+        // Do not enqueue writes that would leave the block unchanged. This
+        // reduces tick work and avoids unnecessary neighbour/chunk updates.
+        if before_state != after_state {
+            changes.push(BlockChange { pos, before_state, after_state });
+        }
     }
     if changes.len() > cap {
         return Err(GeometryError::TooManyBlocks);
     }
     Ok(changes)
+}
+
+#[cfg(test)]
+mod snapshot_transaction_tests {
+    use super::*;
+
+    #[test]
+    fn snapshot_transaction_skips_blocks_already_in_target_state() {
+        let intended = [BlockPos::new(0, 1, 0), BlockPos::new(1, 1, 0)];
+        let snapshot = [
+            SnapshotBlock { pos: intended[0], palette_index: 5 },
+            SnapshotBlock { pos: intended[1], palette_index: 7 },
+        ];
+        let changes = plan_snapshot_transaction(&intended, &snapshot, 7, 8).unwrap();
+        assert_eq!(changes, vec![BlockChange {
+            pos: intended[0], before_state: 5, after_state: 7,
+        }]);
+    }
+
+    #[test]
+    fn snapshot_transaction_can_be_empty_when_every_block_matches() {
+        let pos = BlockPos::new(-4, 12, 9);
+        let snapshot = [SnapshotBlock { pos, palette_index: 3 }];
+        assert!(plan_snapshot_transaction(&[pos], &snapshot, 3, 8).unwrap().is_empty());
+    }
+
+    #[test]
+    fn snapshot_transaction_still_requires_every_target_snapshot() {
+        let intended = [BlockPos::new(0, 0, 0), BlockPos::new(1, 0, 0)];
+        let snapshot = [SnapshotBlock { pos: intended[0], palette_index: 0 }];
+        assert_eq!(
+            plan_snapshot_transaction(&intended, &snapshot, 1, 8),
+            Err(GeometryError::MissingSnapshot)
+        );
+    }
 }
 
 
