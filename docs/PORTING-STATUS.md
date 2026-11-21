@@ -24,7 +24,7 @@ Historical 0.8.0 build and pin information is retained in
 - Undo/redo preflight helper rejects the entire transaction if any current
   block differs from the expected state.
 - Regression tests cover missing snapshots, duplicate positions, no-op
-  filtering, and intervening edits.
+  filtering, guarded undo/redo and intervening edits.
 
 ## Native UI scaffold
 
@@ -62,8 +62,9 @@ Verified directly against the pinned source:
 
 - Rust core tests previously passed in GitHub Actions run
   [44874732757](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44874732757)
-  for the earlier core revision. The newly added snapshot transaction tests
-  still require a fresh CI result.
+  for the earlier core revision. The current core source was rechecked and its
+  snapshot/guarded-history helpers are present; the latest CI run must validate
+  the current commit.
 - Source package validation passed in run
   [44875262029](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44875262029).
   This validates ZIP structure only, not importer acceptance or compilation.
