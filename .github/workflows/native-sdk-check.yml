@@ -7,19 +7,15 @@ on:
     paths:
       - "native/effortless-building-v0.1.0/**"
       - ".github/workflows/native-sdk-check.yml"
-  pull_request:
-    paths:
-      - "native/effortless-building-v0.1.0/**"
-      - ".github/workflows/native-sdk-check.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# A push to a branch with an open PR otherwise runs this expensive pinned
-# SDK install twice. Share the concurrency key between push and PR events.
+# The branch push is the single source of CI runs for this migration branch.
+# Avoid duplicate push/PR runs cancelling one another while SDK setup is active.
 concurrency:
-  group: native-sdk-check-${{ github.event.pull_request.head.ref || github.ref_name }}
+  group: native-sdk-check-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
