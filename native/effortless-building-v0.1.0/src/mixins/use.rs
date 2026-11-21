@@ -1,10 +1,11 @@
-// Game::use_item HEAD: while Effortless Building is enabled, a main-hand
-// right-click on a block records a corner and suppresses the held item's use.
+// Starling 0.9.0 compatibility hook: claim the held-item use only when
+// the selection wand captured a valid block target.
 fn effortless_building_use(
     game: &mut crate::game::Game<'_>,
-) -> core::ops::ControlFlow<Result<Option<Hand>>> {
-    match game.effortless_building_use() {
-        Some(hand) => core::ops::ControlFlow::Break(Ok(hand)),
-        None => core::ops::ControlFlow::Continue(()),
+    _stack: &horizon_client::items::ItemStack,
+    claimed: &mut bool,
+) {
+    if game.effortless_building_use().is_some() {
+        *claimed = true;
     }
 }
