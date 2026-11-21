@@ -1,4 +1,4 @@
-// Effortless Building native integration for Starling 0.8.0.
+// Effortless Building native integration for Starling 0.9.0.
 // The screen is a UI-only milestone: tool choice is persisted, but this
 // module still does not read or modify blocks in the world.
 
