@@ -116,23 +116,23 @@ impl Game<'_> {
 
             // Four evenly spaced samples per non-degenerate axis (at most 64
             // crosses), including both ends so the whole selected volume is shown.
-            let samples = |lo: i32, hi: i32| -> Vec<i32> {
+            let samples = |lo: i32, hi: i32| -> ([i32; 4], usize) {
                 if lo == hi {
-                    return vec![lo];
+                    return ([lo; 4], 1);
                 }
-                (0..4)
-                    .map(|i| {
-                        (i64::from(lo)
-                            + (i64::from(hi) - i64::from(lo)) * i64::from(i) / 3) as i32
-                    })
-                    .collect()
+                let mut out = [lo; 4];
+                for (i, value) in out.iter_mut().enumerate() {
+                    *value = (i64::from(lo)
+                        + (i64::from(hi) - i64::from(lo)) * i as i64 / 3) as i32;
+                }
+                (out, 4)
             };
-            let xs = samples(min[0], max[0]);
-            let ys = samples(min[1], max[1]);
-            let zs = samples(min[2], max[2]);
-            for x in &xs {
-                for y in &ys {
-                    for z in &zs {
+            let (xs, nx) = samples(min[0], max[0]);
+            let (ys, ny) = samples(min[1], max[1]);
+            let (zs, nz) = samples(min[2], max[2]);
+            for x in &xs[..nx] {
+                for y in &ys[..ny] {
+                    for z in &zs[..nz] {
                         let center = [f64::from(*x) + 0.5, f64::from(*y) + 0.5, f64::from(*z) + 0.5];
                         let d = 0.18;
                         lines.push(WorldLine::new(
@@ -155,8 +155,6 @@ impl Game<'_> {
             }
             // WorldGeometry validates the whole batch atomically and enforces its
             // fixed per-view line capacity. A refusal draws nothing from this batch.
-
-
             let _ = draw.lines(&lines);
         });
     }
