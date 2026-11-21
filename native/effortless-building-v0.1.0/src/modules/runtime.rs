@@ -61,6 +61,15 @@ pub fn clear_selection_points() {
     clear_preflight_status();
 }
 
+/// Retire every piece of transient builder state owned by the closing world.
+/// This is intentionally separate from closing/reopening the builder screen.
+pub fn reset_world_session() {
+    clear_selection_points();
+    PENDING_UI_ACTION.store(NO_ACTION, Ordering::Release);
+    clear_preflight_status();
+    crate::game::effortless_building_native::reset_effortless_building_preview();
+}
+
 pub fn selection_block_count_for(selection: SelectionPoints, tool: usize) -> Option<u128> {
     let (a, b) = (selection.first?, selection.second?);
     let span = |x: i32, y: i32| -> u128 {
@@ -479,6 +488,23 @@ mod tests {
 #[cfg(test)]
 mod selection_point_tests {
     use super::*;
+
+    #[test]
+    fn closing_a_world_retires_selection_preflight_and_queued_ui_action() {
+        let selection = SelectionPoints {
+            first: Some([10, 64, 10]),
+            second: Some([14, 68, 14]),
+        };
+        *SELECTION_POINTS.lock().unwrap_or_else(|e| e.into_inner()) = selection;
+        set_preflight_status(selection, 0, "Preflight OK".to_owned());
+        queue_ui_action(2);
+
+        reset_world_session();
+
+        assert_eq!(selection_points(), SelectionPoints::default());
+        assert!(preflight_status_for(SelectionPoints::default(), 0).is_empty());
+        assert_eq!(PENDING_UI_ACTION.load(Ordering::Acquire), NO_ACTION);
+    }
 
     #[test]
     fn two_points_are_captured_and_third_click_starts_a_new_pair() {
