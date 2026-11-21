@@ -10,7 +10,7 @@ impl BlockPos { pub const fn new(x:i32,y:i32,z:i32)->Self { Self{x,y,z} } }
 pub enum GeometryError { InvalidRadius, InvalidHeight, InvalidBatchSize, TooManyBlocks, CoordinateOverflow, MissingSnapshot }
 #[derive(Clone, Copy, Debug)]
 pub struct Limits { pub max_blocks: usize }
-impl Default for Limits { fn default()->Self { Self{max_blocks:16_384} } }
+impl Default for Limits { fn default()->Self { Self{max_blocks:8_192} } }
 
 fn point(x:i64,y:i64,z:i64)->Result<BlockPos,GeometryError>{
     Ok(BlockPos::new(i32::try_from(x).map_err(|_|GeometryError::CoordinateOverflow)?,i32::try_from(y).map_err(|_|GeometryError::CoordinateOverflow)?,i32::try_from(z).map_err(|_|GeometryError::CoordinateOverflow)?))
