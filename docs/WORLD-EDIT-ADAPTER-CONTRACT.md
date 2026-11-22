@@ -158,3 +158,42 @@ Both methods are public in the pinned horizon_world::level::Behaviours API and c
 The adapter still needs to prove that the synthetic click context gives appropriate orientation for each supported block, that neighbour-dependent placement remains deterministic across the planned order, and that no untracked side effect is introduced. Runtime testing remains mandatory.
 
 This discovery supersedes the older note that a generic public placement API had not been found. The current project code is still read-only: no placement calls have been wired into the mod yet.
+
+## Placement-preview limitations — audited against pinned source
+
+The current preflight uses `placement_preview`, but this API is deliberately
+read-only and does **not** execute `set_placed_by`. The pinned
+`crates/horizon-world/src/level/place.rs` shows that the real placement path
+writes the primary block, then invokes `set_placed_by`, which may create a
+companion block or schedule ticks / trigger additional behavior (for example,
+pistons and tripwire hooks). The preview reports the known companion for beds,
+doors, and tall plants, but it is not a complete simulation of every post-write
+effect.
+
+The current guard requiring `ItemKind::Block` and an empty
+`BlockData::chain` is a conservative filter: `chain` is the recognised Java
+block-class override chain used by Horizon's behaviour dispatch. An empty chain
+rules out those recognised class overrides; it is **not** a universal proof
+that neighbour updates, scheduled ticks, external mod hooks, or all other
+world side effects are absent.
+
+Consequently:
+
+- Keep the current preflight read-only.
+- Do not interpret a successful preview as proof that a multi-block edit is
+  side-effect-free or rollback-safe.
+- Freeze the exact item ID and all `PlaceContext` inputs used by preview
+  (including face, hit position, yaw, pitch, and sneaking) in the preflight
+  record. Revalidation must use those frozen inputs and confirm the offhand
+  item identity still matches.
+- Before the first write milestone, explicitly audit the event queue and
+  neighbour-update behavior for the whitelist. Reject unsupported states
+  rather than broadening the whitelist based only on property-free states.
+- Preserve the per-write ledger and guarded rollback. Even a successful
+  `place_block` result does not make a sequence of placements atomic.
+
+Source: pinned Starling/Horizon revision
+`ff303502a4f7982551a0e0d3622d9268efe9e829`, especially
+`crates/horizon-world/src/level/place.rs` (`placement`,
+`set_placed_by`, `place`, and `placement_preview`) and
+`crates/horizon-world/src/level/data.rs` (`BlockData::chain`).
