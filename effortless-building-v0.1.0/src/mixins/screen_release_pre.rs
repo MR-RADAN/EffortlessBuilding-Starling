@@ -5,10 +5,11 @@ fn effortless_building_screen_release_pre(
     _modifiers: u32,
     canceled: &mut bool,
 ) {
+    use crate::game::effortless_building as m;
     use std::sync::atomic::Ordering;
 
     if button == 0
-        && EFFORTLESS_BUILDING_LEFT_PRESS_CANCELLED.swap(false, Ordering::AcqRel)
+        && m::LEFT_PRESS_CANCELLED.swap(false, Ordering::AcqRel)
     {
         *canceled = true;
     }

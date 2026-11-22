@@ -1,8 +1,4 @@
 // Cancel only clicks owned by the builder panel, before vanilla screen dispatch.
-use std::sync::atomic::{AtomicBool, Ordering};
-
-static EFFORTLESS_BUILDING_LEFT_PRESS_CANCELLED: AtomicBool = AtomicBool::new(false);
-
 fn effortless_building_screen_click_pre(
     game: &crate::game::Game<'_>,
     screen: &crate::game::native_hooks::ScreenView<'_>,
@@ -11,6 +7,7 @@ fn effortless_building_screen_click_pre(
     canceled: &mut bool,
 ) {
     use crate::game::effortless_building as m;
+    use std::sync::atomic::Ordering;
 
     if button != 0 {
         return;
@@ -18,7 +15,7 @@ fn effortless_building_screen_click_pre(
 
     // Every new left press supersedes a stale press whose release may have
     // been lost during a screen transition.
-    EFFORTLESS_BUILDING_LEFT_PRESS_CANCELLED.store(false, Ordering::Release);
+    m::LEFT_PRESS_CANCELLED.store(false, Ordering::Release);
 
     if screen.id != "mod" || game.native_mod_screen() != Some(m::ID) {
         return;
