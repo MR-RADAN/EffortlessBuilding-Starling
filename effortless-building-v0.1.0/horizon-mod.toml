@@ -127,6 +127,6 @@ helper = "src/mixins/screen_release_pre.rs"
 bindings = [
   { name = "screen", ty = "&crate::game::native_hooks::ScreenView<'_>", value = "screen" },
   { name = "button", ty = "i32", value = "button" },
-  { name = "modifiers", ty = "u32", value = "modifiers" },
+  { name = "_modifiers", ty = "u32", value = "modifiers" },
   { name = "canceled", ty = "&mut bool", value = "&mut *canceled" },
 ]
