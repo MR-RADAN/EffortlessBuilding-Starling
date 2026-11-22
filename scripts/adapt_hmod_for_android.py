@@ -127,7 +127,7 @@ def render_manifest(mod: dict, native: dict) -> tuple[str, list[str]]:
 
     if not native.get("module") or not native.get("mixin"):
         raise ValueError("expected at least one native.module and one native.mixin")
-    if len(native["mixin"]) != 9 or len(native["module"]) != 3:
+    if len(native["mixin"]) != 10 or len(native["module"]) != 3:
         raise ValueError(
             f"unexpected Starling port shape: {len(native['mixin'])} mixins, "
             f"{len(native['module'])} modules (expected 9 and 3)"
