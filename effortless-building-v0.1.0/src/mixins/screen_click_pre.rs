@@ -32,5 +32,5 @@ fn effortless_building_screen_click_pre(
         m::queue_ui_action(action);
     }
     *canceled = true;
-    EFFORTLESS_BUILDING_LEFT_PRESS_CANCELLED.store(true, Ordering::Release);
+    m::LEFT_PRESS_CANCELLED.store(true, Ordering::Release);
 }
