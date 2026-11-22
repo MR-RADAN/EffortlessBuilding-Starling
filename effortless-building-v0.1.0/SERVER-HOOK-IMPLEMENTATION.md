@@ -391,3 +391,36 @@ Upstream reference for the current 26.3 implementation:
   recording.
 - `common/.../buildpipeline/ConstraintSystem.java` — world-border/build-height,
   target-count, protected block-entity and replacement constraints.
+
+
+## Starling placement API review — pinned 0.9.0 source
+
+A further source inspection found the pinned game's
+`crates/horizon-mod-vocab/src/hooks/state_for_placement.rs` contract and
+its implementation bridge in
+`crates/horizon-client/src/game/native_hooks/base.rs`.
+
+This is a **callback hook**, not a public helper for asking vanilla to resolve
+an arbitrary proposed placement:
+- It fires when vanilla is already processing a real `BlockItem.place` or
+  dispenser placement, and supplies the block's default state, a
+  `PlacementContext`, and the fluid at the target position.
+- A mod may answer with a state belonging to that same block, refuse the
+  placement, or leave the result to the next mod/vanilla.
+- Vanilla still performs the normal survival and entity-obstruction checks
+  after the hook.
+- The bridge is authoritative-server-only.
+
+Consequently, this hook does **not** let Effortless Building directly ask
+vanilla for a placement state at every coordinate in a bulk build. Nor does
+the documented contract provide a supported way to synthesize the original
+player hit context for an arbitrary target. It is useful for custom block
+placement behavior, but it does not close the current vanilla-state-resolution
+gap for this port.
+
+The existing native write path through `Game::with_level` and
+`Behaviours::set_block` remains a lower-level state write, not equivalent to
+`BlockItem.place`. Before any mutation is enabled, the adapter must either
+prove a supported per-block state resolver and required placement side effects,
+or keep the block type outside the safe whitelist. Multiblock and block-entity
+items remain rejected.
