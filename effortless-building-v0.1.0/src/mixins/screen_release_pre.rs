@@ -1,6 +1,10 @@
-// Pair a cancelled builder-panel press with its release so screen drag
-// handling cannot receive only the second half of the mouse gesture.
-fn effortless_building_screen_release_pre(button: i32, canceled: &mut bool) {
+// A cancelled press must have its matching release cancelled as well.
+fn effortless_building_screen_release_pre(
+    _screen: &crate::game::native_hooks::ScreenView<'_>,
+    button: i32,
+    _modifiers: u32,
+    canceled: &mut bool,
+) {
     use std::sync::atomic::Ordering;
 
     if button == 0
