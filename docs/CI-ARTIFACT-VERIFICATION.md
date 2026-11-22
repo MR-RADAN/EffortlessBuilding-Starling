@@ -7,12 +7,16 @@ Target: Starling 0.9.0 / Android arm64-v8a
 
 ## Workflow result
 
-GitHub Actions run 120 completed successfully on branch `migration/native-sdk-0.2`.
+GitHub Actions run [44978959476](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44978959476) completed successfully on branch `migration/native-sdk-0.2`.
 
-- Commit: `0d2ee7f2c1684f72aae86c737c1040d9db523cec`
+- Commit: `7ba93247ece885e15ba8aa31787d8fb5fe626d27`
 - Workflow: `.github/workflows/native-sdk-check.yml`
 - `native-sdk-check`: success
 - `android-arm64-build`: success
+- HMOD artifact ID: `14737340947` (16,978 bytes)
+- Android ARM64 artifact ID: `14737965965` (48,632,667 bytes)
+
+The standalone Rust core regression workflow [44978773735](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44978773735) also passed: **60 passed, 0 failed**, including the selection-anchor reach regression.
 
 ## Downloaded artifact inspection
 

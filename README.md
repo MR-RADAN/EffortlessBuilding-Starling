@@ -26,7 +26,7 @@ limit. These previews do not read block states or modify the world. CI has two s
 signed SDK pin, manifest, declared helper files, Rust syntax and `.hmod`
 packaging. A separate Android ARM64 compatibility job adapts that source to
 Starling's legacy mixin build layout and compiles it inside the pinned Starling
-0.9.0 game crate. That integration build passed, but it does not prove the
+0.9.0 game crate. That integration build passed in run [44978959476](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44978959476), but it does not prove the
 launcher-side SDK 0.2 build service accepts this exact HMOD. See
 [the artifact verification report](docs/CI-ARTIFACT-VERIFICATION.md).
 
@@ -62,8 +62,9 @@ The active migration branch uses Starling's Native SDK 0.2 manifest and
 versioned `.hmod` source package. The older `.hnmod` bundle is retained only
 as a reference; it is not the SDK 0.2 install artifact. GitHub Actions checks
 the pinned SDK, declared source files, Rust syntax, manifest, and `.hmod`
-packaging. This does not type-check every injected helper inside the game
-crate or prove launcher-side import.
+packaging. A separate Android ARM64 compatibility job adapts the HMOD source to Starling's
+legacy mixin bundle layout and compiles the injected helpers inside the pinned
+game crate. This does not prove launcher-side SDK 0.2 import/build-service acceptance.
 
 The current native mixin follows Starling's in-process Wrench pattern: read-only
 world checks through `Game`, then (when implemented) block behaviour calls

@@ -62,12 +62,14 @@ as reference material. They are not the active launcher package.
 ## CI verification
 
 - Standalone Rust core regression workflow [44978773735](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44978773735) passed on the migration branch: **60 passed, 0 failed**. This includes the new regression proving reach is checked against the selected anchor rather than every target block.
-Workflow run [44974937979](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44974937979)
-completed successfully on `migration/native-sdk-0.2`:
+Workflow run [44978959476](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44978959476)
+completed successfully on `migration/native-sdk-0.2` (commit `7ba93247ece885e15ba8aa31787d8fb5fe626d27`):
 
 - `native-sdk-check`: passed SDK pin/signature, manifest, declared helper
   files, syntax checks and `.hmod` package validation.
 - `android-arm64-build`: passed the pinned Starling 0.9.0 integration build.
+- The run uploaded HMOD artifact `14737340947` and ARM64 artifact `14737965965`.
+- Core regression workflow [44978773735](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44978773735): **60 passed, 0 failed**.
 
 The ARM64 job uses `scripts/adapt_hmod_for_android.py` to adapt the SDK 0.2
 source bundle to Starling's legacy mixin build layout, then runs the pinned
