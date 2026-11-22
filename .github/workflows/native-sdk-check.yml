@@ -5,7 +5,7 @@ on:
     branches:
       - migration/native-sdk-0.2
     paths:
-      - "native/effortless-building-v0.1.0/**"
+      - "effortless-building-v0.1.0/**"
       - ".github/workflows/native-sdk-check.yml"
       - "scripts/adapt_hmod_for_android.py"
   workflow_dispatch:
@@ -136,7 +136,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: effortless-building-v0.1.0-hmod
-          path: native/effortless-building-v0.1.0/target/horizon-mod/effortless_building-0.1.0.hmod
+          path: effortless-building-v0.1.0/target/horizon-mod/effortless_building-0.1.0.hmod
           if-no-files-found: error
           retention-days: 14
 

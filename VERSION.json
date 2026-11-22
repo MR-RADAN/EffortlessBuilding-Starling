@@ -8,7 +8,7 @@
   "target": "Starling 0.9.0 / Horizon ARM64",
   "horizon_revision": "ff303502a4f7982551a0e0d3622d9268efe9e829",
   "horizon_mixins_revision": "5a64af938ec86b00d53d16a408aabc0038fb3e57",
-  "status": "46 Rust core tests passing; Starling 0.9.0 native UI, stick-gated two-point selection, read-only spatial preview and target-position count implemented in source; ARM64 native compile retry in progress",
+  "status": "46 Rust core tests passing; Starling 0.9.0 native UI, stick-gated two-point selection, read-only spatial preview and target-position count implemented in source; ARM64 native compile successful in CI; launcher import and in-game runtime remain unverified",
   "implemented_core": [
     "line",
     "wall",

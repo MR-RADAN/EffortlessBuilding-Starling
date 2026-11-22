@@ -73,7 +73,7 @@ The supported launcher route is **Mods → Add from GitHub**. Use the repository
 
 `https://github.com/MR-RADAN/EffortlessBuilding-Starling/tree/migration/native-sdk-0.2`
 
-Starling's GitHub installer resolves the branch to a commit, scans the source archive for flat native projects, validates the selected package, and installs it. This branch currently contains the native project at `native/effortless-building-v0.1.0/`; its mod ID is `effortless_building`. Review the resolved source revision and grant native-code permission only if you trust it. Then enable the mod in the selected instance and run **Build** from the Mods page.
+Starling's GitHub installer resolves the branch to a commit, scans the source archive for flat native projects, validates the selected package, and installs it. This branch currently contains the native project at `effortless-building-v0.1.0/`; its mod ID is `effortless_building`. Review the resolved source revision and grant native-code permission only if you trust it. Then enable the mod in the selected instance and run **Build** from the Mods page.
 
 The CI-produced `.hmod` is a source package, not an APK or a ready-to-load `.so`. The current workflow artifact is temporary (14-day retention), and this repository does not yet publish a GitHub Release containing the `.hmod` asset. Therefore, use **Add from GitHub** with the branch URL above for the first launcher-side installation test; do not manually copy the ARM64 library into Android storage.
 
