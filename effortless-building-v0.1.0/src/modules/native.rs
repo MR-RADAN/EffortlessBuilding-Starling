@@ -58,6 +58,8 @@ pub(super) enum NativePreflightError {
     NoSelectionCornerInReach,
     MissingOffhandStack,
     UnsupportedOffhandBlockItem,
+    UnsupportedTargetBlock,
+    TargetOccupied { index: usize },
     UnresolvedState { index: usize },
 }
 
@@ -172,6 +174,13 @@ impl Game<'_> {
             })
             .ok_or(NativePreflightError::UnsupportedOffhandBlockItem)?;
 
+        // First write milestone is deliberately limited to blocks whose
+        // placement does not create a block entity. The target block's
+        // metadata is resolved from the same pinned game registry.
+        if self.res.facts().get(target_state).block_entity {
+            return Err(NativePreflightError::UnsupportedTargetBlock);
+        }
+
         let layout = self.world.layout();
         let reach = self.reach() + 1.0;
         let eye = self.eye_position();
@@ -208,6 +217,12 @@ impl Game<'_> {
             let state_id = self.world.block(pos[0], pos[1], pos[2]);
             if self.pack.assets.registry.state(state_id).is_none() {
                 return Err(NativePreflightError::UnresolvedState { index });
+            }
+            // Never overwrite an existing solid/non-replaceable block. An
+            // already-correct target is a harmless no-op; every other target
+            // must be replaceable (air, grass, water, snow layers, etc.).
+            if state_id != target_state && !self.res.facts().get(state_id).replaceable {
+                return Err(NativePreflightError::TargetOccupied { index });
             }
             // Preserve the typed, registry-scoped ID at the native boundary.
             snapshot.push(NativePreflightBlock { pos, before_state: state_id });
@@ -261,7 +276,9 @@ impl Game<'_> {
         else {
             return false;
         };
-        if target_state != plan.target_state {
+        if target_state != plan.target_state
+            || self.res.facts().get(target_state).block_entity
+        {
             return false;
         }
 
@@ -295,6 +312,8 @@ impl Game<'_> {
             let current_state = self.world.block(x, y, z);
             if current_state != block.before_state
                 || self.pack.assets.registry.state(current_state).is_none()
+                || (current_state != target_state
+                    && !self.res.facts().get(current_state).replaceable)
             {
                 return false;
             }
