@@ -2,7 +2,7 @@ name: Rust core tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, migration/native-sdk-0.2]
     paths:
       - "src/**"
       - "Cargo.toml"
