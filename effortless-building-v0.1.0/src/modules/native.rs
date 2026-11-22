@@ -273,7 +273,7 @@ impl Game<'_> {
                     return None;
                 }
                 behaviours.placement_preview(level, ticks, &context)
-            }).ok_or(NativePreflightError::VanillaPlacementRejected { index })?;
+            }).flatten().ok_or(NativePreflightError::VanillaPlacementRejected { index })?;
             if preview.pos != at {
                 return Err(NativePreflightError::PlacementRedirected { index });
             }
