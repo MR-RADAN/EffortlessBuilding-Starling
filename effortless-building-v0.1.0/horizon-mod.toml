@@ -107,13 +107,24 @@ bindings = [
 ]
 
 [[native.mixin]]
-id = "screen_click"
+id = "screen_click_pre"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_screen_mouse_button_pressed_post"
-helper = "src/mixins/screen_click.rs"
+target = "horizon_client::game::native_hooks::Game<'_>::native_screen_mouse_button_pressed_pre"
+helper = "src/mixins/screen_click_pre.rs"
 bindings = [
   { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
-  { name = "screen", ty = "&crate::mod_api::NativeScreenView<'_>", value = "screen" },
+  { name = "screen", ty = "&crate::game::native_hooks::ScreenView<'_>", value = "screen" },
   { name = "button", ty = "i32", value = "button" },
-  { name = "_modifiers", ty = "u32", value = "modifiers" },
+  { name = "modifiers", ty = "u32", value = "modifiers" },
+  { name = "canceled", ty = "&mut bool", value = "&mut *canceled" },
+]
+
+[[native.mixin]]
+id = "screen_release_pre"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_screen_mouse_button_released_pre"
+helper = "src/mixins/screen_release_pre.rs"
+bindings = [
+  { name = "button", ty = "i32", value = "button" },
+  { name = "canceled", ty = "&mut bool", value = "&mut *canceled" },
 ]
