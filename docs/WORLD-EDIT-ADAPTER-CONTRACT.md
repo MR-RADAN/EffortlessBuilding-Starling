@@ -101,26 +101,33 @@ general public Native Mod API: it is an in-crate capability provided by the
 SDK's source-injection model. Follow the Wrench pattern rather than inventing
 a separate `ServerHost` interface or using unsafe/private-field workarounds.
 
-The safe placement path for this project is therefore available in principle:
+Starling exposes a lower-level world-write route to injected child modules:
+`self.with_level(...)`, `Behaviours::set_block(...)`, and
+`self.process_level_events()`. The Wrench source proves that these calls are
+reachable from this injection model. This is only a mutation primitive; it is
+**not yet a safe placement adapter** and does not reproduce vanilla
+`BlockItem.place` semantics.
 
-1. Revalidate the frozen selection and every before-state immediately before
-   mutation, on the authoritative local logical-server Game instance.
-2. Resolve the intended complete `BlockStateId` through the active registry;
-   reject unresolved or registry-incompatible states.
-3. Use `self.with_level(|behaviours, level, ticks| ...)` for survival checks
-   and `Behaviours::set_block(..., level_flags::UPDATE_ALL)`; never mutate
-   chunk storage directly.
-4. Process level events through `self.process_level_events()` after writes.
-5. Keep work bounded, yield/cancel between batches, record only actual
-   successful writes, and use guarded best-effort restoration if a later
-   write fails. Do not claim atomicity or guaranteed rollback.
+Before this project enables any writes, it must still establish a supported
+way to derive a complete placement state and reproduce required placement
+side effects. A conservative first implementation may whitelist only states
+whose property and block-entity behavior has been source-verified; all other
+items must fail closed. Even a property-free state still needs replacement,
+survival, neighbour-shape, entity-collision, and block-specific side-effect
+checks. The current resolver only identifies a candidate default state.
+
+The future mutation primitive, if and only if those checks are implemented,
+will use `self.with_level(...)`, `Behaviours::set_block(...,
+level_flags::UPDATE_ALL)`, and `self.process_level_events()`. Work must remain
+bounded, revalidate the frozen plan immediately before mutation, record only
+actual successful writes, and use guarded best-effort restoration after
+partial failure. Do not claim atomicity or guaranteed rollback.
 
 This finding removes the previous API-access blocker, but it does not mean
-bulk placement is already implemented or validated. The current native
-bundle remains read-only until the transaction/confirmation path is
-implemented and tested. In particular, placement semantics, block entities,
-inventory accounting, partial failure handling, and runtime behaviour still
-need explicit verification.
+bulk placement is already safe, implemented, or validated. The current native
+bundle remains read-only. Placement semantics, block entities, inventory
+accounting, partial failure handling, and runtime behavior remain explicit
+gates.
 
 Reference implementation at the pinned Starling revision:
 - `native-mods/wrench/mixins/wrench/native.rs` — in-crate `with_level`

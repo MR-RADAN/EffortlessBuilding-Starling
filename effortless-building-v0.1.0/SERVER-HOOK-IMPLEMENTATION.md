@@ -424,3 +424,36 @@ The existing native write path through `Game::with_level` and
 prove a supported per-block state resolver and required placement side effects,
 or keep the block type outside the safe whitelist. Multiblock and block-entity
 items remain rejected.
+
+
+## Screen input interception review — pinned Starling 0.9.0
+
+The existing Effortless Building UI callback is attached to
+`native_screen_mouse_button_pressed_post`. Its callback receives no
+cancellation flag, so it can observe and queue an action but cannot prevent
+the screen's own slot/button/drag handling. The current implementation
+correctly does not claim otherwise.
+
+The pinned source exposes a separate cancellable pre-hook:
+`horizon_client::game::native_hooks::Game<'_>::native_screen_mouse_button_pressed_pre`.
+Its signature receives `&ScreenView<'_>`, the GLFW button, modifiers, and
+`&mut bool` for cancellation. The hook contract explicitly says setting
+`canceled` stops further screen handling, including slots, screen buttons,
+drag, hotbar, sort, and header actions. It fires before screen input dispatch
+for supported game/title screens; it does not cover loading/connect screens,
+server dialogs, book/sign editors, or gamepad/focus-generated clicks.
+
+This is a viable replacement point for the current UI's left-click action
+capture. Before changing the mixin, the adapter must bind the exact pinned
+`ScreenView<'_>` type (not assume it is interchangeable with the current
+`NativeScreenView<'_>`), identify the mod-screen hit region, set
+`*canceled = true` only when an Effortless Building control actually owns
+the click, and leave all other clicks untouched. The corresponding release
+must also be reviewed so a cancelled press cannot leave a drag/release path
+in an inconsistent state. A source/CI compile is required after the change;
+runtime touch testing remains necessary.
+
+Pinned source references:
+- `crates/horizon-mod-vocab/src/hooks/screen_mouse_button_pressed_pre.rs`
+- `crates/horizon-client/src/game/native_hooks/base.rs`
+- `crates/horizon-mod-vocab/src/hooks/screen_mouse_button_pressed_post.rs` (Post behavior)
