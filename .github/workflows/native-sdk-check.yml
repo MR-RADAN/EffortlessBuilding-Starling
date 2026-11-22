@@ -54,7 +54,7 @@ jobs:
         run: cargo install --debug --path starling-source/crates/cargo-horizon-mod --locked
 
       - name: Validate declared helper files and Rust syntax
-        working-directory: native/effortless-building-v0.1.0
+        working-directory: effortless-building-v0.1.0
         run: |
           python3 - <<'PY'
           import pathlib
@@ -87,13 +87,13 @@ jobs:
       - name: Verify lossless HMOD to Android bundle adaptation
         run: |
           python3 scripts/adapt_hmod_for_android.py \
-            native/effortless-building-v0.1.0 "$RUNNER_TEMP/android-mods"
+            effortless-building-v0.1.0 "$RUNNER_TEMP/android-mods"
           python3 - <<'PY'
           import os
           import pathlib
           import tomllib
 
-          source = pathlib.Path("native/effortless-building-v0.1.0")
+          source = pathlib.Path("effortless-building-v0.1.0")
           bundle = pathlib.Path(os.environ["RUNNER_TEMP"]) / "android-mods/effortless_building"
           old = tomllib.loads((bundle / "horizon-mixin.toml").read_text())
           new = tomllib.loads((source / "horizon-mod.toml").read_text())
@@ -121,11 +121,11 @@ jobs:
           PY
 
       - name: Verify signed SDK pin and check mod crate
-        working-directory: native/effortless-building-v0.1.0
+        working-directory: effortless-building-v0.1.0
         run: cargo horizon-mod check
 
       - name: Package the native source mod
-        working-directory: native/effortless-building-v0.1.0
+        working-directory: effortless-building-v0.1.0
         run: |
           cargo horizon-mod build
           test -s target/horizon-mod/effortless_building.hmod
@@ -205,7 +205,7 @@ jobs:
       - name: Convert HMOD and run Starling's real ARM64 native build
         run: |
           python3 scripts/adapt_hmod_for_android.py \
-            native/effortless-building-v0.1.0 "$RUNNER_TEMP/android-mods"
+            effortless-building-v0.1.0 "$RUNNER_TEMP/android-mods"
           test "$(grep -c '^\[\[injection\]\]' "$RUNNER_TEMP/android-mods/effortless_building/horizon-mixin.toml")" -eq 9
           test "$(grep -c '^\[\[module\]\]' "$RUNNER_TEMP/android-mods/effortless_building/horizon-mixin.toml")" -eq 3
           NATIVE_LIBRARY_ONLY=1 ABI=arm64-v8a PROFILE=fast \
