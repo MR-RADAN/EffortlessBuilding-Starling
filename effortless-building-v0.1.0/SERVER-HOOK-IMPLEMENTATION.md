@@ -352,3 +352,42 @@ The current native preflight also:
 - revalidates the same selection, tool, offhand material, authority, and before-states before a future write phase.
 
 These are still read-only checks. There is no bulk placement, commit, live undo/redo, inventory consumption, or block-entity preservation implementation in the active SDK 0.2 source. The successful ARM64 CI integration compile is not a runtime test, and launcher-side SDK 0.2 build-service validation remains outstanding.
+
+
+## Additional placement-state safety gate — upstream 26.3 review
+
+The offhand resolver currently identifies a candidate block by exact item ID
+and the registry's default state. That is enough for read-only material
+identification, but it is **not** equivalent to vanilla block placement.
+
+A default state may omit the orientation, half, waterlogging, or other
+properties that normal placement derives from the clicked face, hit position,
+player orientation, and neighbouring blocks. Some items also require
+multi-position placement and post-placement initialization. The upstream
+26.3 implementation explicitly excludes doors, beds and tall plants from its
+simple build-trigger path because vanilla's `setPlacedBy` behavior cannot be
+reproduced by naive batch placement; its server placement path constructs a
+placement context from the original hit face/location and calls
+`getStateForPlacement` before writing.
+
+Therefore, before enabling any world write in this Starling port:
+
+1. Do not treat exact item-ID/default-state resolution as proof that a block
+   is safe to place as a single state.
+2. Either implement and verify a Starling-equivalent placement context for
+   facing/half/waterlogged and other state properties, or reject those
+   candidates.
+3. Reject multi-block items (including doors, beds and tall plants) until
+   their complete multi-position placement and rollback behavior is supported.
+4. Reject block-entity blocks unless initialization, NBT/inventory semantics,
+   and guarded restoration are explicitly implemented and tested.
+5. Keep the current resolver read-only. No block write is enabled by this
+   note.
+
+Upstream reference for the current 26.3 implementation:
+- `common/.../buildpipeline/BuildPipeline.java` — filters multiblock trigger items.
+- `common/.../network/PacketHandler.java` — server-side placement context,
+  target-state derivation, replacement checks, inventory handling and undo
+  recording.
+- `common/.../buildpipeline/ConstraintSystem.java` — world-border/build-height,
+  target-count, protected block-entity and replacement constraints.
