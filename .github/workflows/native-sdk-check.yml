@@ -7,6 +7,7 @@ on:
     paths:
       - "native/effortless-building-v0.1.0/**"
       - ".github/workflows/native-sdk-check.yml"
+      - "scripts/adapt_hmod_for_android.py"
   workflow_dispatch:
 
 permissions:
@@ -81,6 +82,42 @@ jobs:
                   ["rustfmt", "--edition", "2024", "--emit", "stdout", str(path)],
                   check=True, stdout=subprocess.DEVNULL,
               )
+          PY
+
+      - name: Verify lossless HMOD to Android bundle adaptation
+        run: |
+          python3 scripts/adapt_hmod_for_android.py \
+            native/effortless-building-v0.1.0 "$RUNNER_TEMP/android-mods"
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import tomllib
+
+          source = pathlib.Path("native/effortless-building-v0.1.0")
+          bundle = pathlib.Path(os.environ["RUNNER_TEMP"]) / "android-mods/effortless_building"
+          old = tomllib.loads((bundle / "horizon-mixin.toml").read_text())
+          new = tomllib.loads((source / "horizon-mod.toml").read_text())
+          injections = old.get("injection", [])
+          modules = old.get("module", [])
+          assert len(injections) == 9, len(injections)
+          assert len(modules) == 3, len(modules)
+          assert {row["id"] for row in injections} == {row["id"] for row in new["native"]["mixin"]}
+          assert {row["id"] for row in modules} == {row["id"] for row in new["native"]["module"]}
+          for row in new["native"]["mixin"]:
+              converted = next(item for item in injections if item["id"] == row["id"])
+              for key in ("kind", "target", "helper", "bindings", "cancellable"):
+                  if key in row:
+                      assert converted[key] == row[key], (row["id"], key)
+          for row in new["native"]["module"]:
+              converted = next(item for item in modules if item["id"] == row["id"])
+              for key in ("file", "name", "source", "visibility"):
+                  if key in row:
+                      assert converted[key] == row[key], (row["id"], key)
+          for row in injections:
+              assert (bundle / row["helper"]).is_file()
+          for row in modules:
+              assert (bundle / row["source"]).is_file()
+          print("Adapter verified: 9/9 mixins, 3/3 modules, bindings and source files preserved.")
           PY
 
       - name: Verify signed SDK pin and check mod crate
