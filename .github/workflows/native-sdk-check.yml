@@ -194,9 +194,10 @@ jobs:
         run: |
           sudo swapoff -a || true
           where=/mnt
+          size=20G
           avail=$(df --output=avail -BG "$where" 2>/dev/null | tail -1 | tr -dc 0-9)
-          if [ "${avail:-0}" -lt 30 ]; then where=$RUNNER_TEMP; fi
-          sudo fallocate -l 20G "$where/starling-release.swap"
+          if [ "${avail:-0}" -lt 30 ]; then where=$RUNNER_TEMP; size=10G; fi
+          sudo fallocate -l "$size" "$where/starling-release.swap"
           sudo chmod 600 "$where/starling-release.swap"
           sudo mkswap "$where/starling-release.swap" > /dev/null
           sudo swapon "$where/starling-release.swap"
