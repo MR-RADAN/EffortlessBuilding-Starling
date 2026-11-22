@@ -218,10 +218,12 @@ impl Game<'_> {
             if self.pack.assets.registry.state(state_id).is_none() {
                 return Err(NativePreflightError::UnresolvedState { index });
             }
-            // Never overwrite an existing solid/non-replaceable block. An
-            // already-correct target is a harmless no-op; every other target
-            // must be replaceable (air, grass, water, snow layers, etc.).
-            if state_id != target_state && !self.res.facts().get(state_id).replaceable {
+            // Never destroy or replace an existing block, including
+            // replaceable plants, fluids, snow layers, and other soft blocks.
+            // Only air is an empty target; an already-correct target is a no-op.
+            if state_id != target_state
+                && !self.res.facts().get(state_id).air
+            {
                 return Err(NativePreflightError::TargetOccupied { index });
             }
             // Preserve the typed, registry-scoped ID at the native boundary.
@@ -313,7 +315,7 @@ impl Game<'_> {
             if current_state != block.before_state
                 || self.pack.assets.registry.state(current_state).is_none()
                 || (current_state != target_state
-                    && !self.res.facts().get(current_state).replaceable)
+                    && !self.res.facts().get(current_state).air)
             {
                 return false;
             }
