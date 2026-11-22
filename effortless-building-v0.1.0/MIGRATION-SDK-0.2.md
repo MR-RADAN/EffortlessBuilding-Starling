@@ -16,16 +16,18 @@ The official package output is `.hmod`, not `.hnmod`. Native build is performed 
 
 ## Migration map
 
-Preserve the existing nine native injection helpers as native mixins:
-- `use` -> `Game::use_item`, HEAD, cancellable
+Preserve the nine native mixins declared by the SDK 0.2 manifest:
+- `use` -> legacy compatibility `Game::native_use_item_old`, HEAD, claims the held-item action when a selection point is recorded
 - `world_preview` -> `Game::native_submit_custom_geometry`, HEAD
-- `list` -> `Game::native_mods`, HEAD
-- `settings` -> `Game::native_settings`, HEAD
-- `click` -> `Game::native_settings_click`, HEAD
-- `screen_render` -> `Game::native_screen_render_post`, HEAD
-- `screen_click` -> `Game::native_screen_mouse_button_pressed_pre`, HEAD
-- `screen_release` -> `Game::native_screen_mouse_button_released_pre`, HEAD
-- `tick` -> `Game::native_tick`, HEAD
+- `list` -> legacy compatibility `Game::native_mods`, HEAD
+- `settings` -> legacy compatibility `Game::native_settings`, HEAD
+- `click` -> legacy compatibility `Game::native_settings_click`, HEAD
+- `world_close` -> `Game::finish_close_world`, HEAD; clears selection, queued UI action, preflight status and preview cache
+- `tick` -> legacy compatibility `Game::native_tick`, HEAD
+- `screen_render` -> `Game::native_screen_render_background`, HEAD
+- `screen_click` -> `Game::native_screen_mouse_button_pressed_post`, HEAD
+
+**Input limitation:** Starling 0.9.0 exposes the screen mouse-button callback as a Post event with no cancellation parameter. The SDK 0.2 mixin can detect taps inside the builder panel and queue UI actions, but it cannot prove or enforce suppression of the underlying screen/world click. There is no `screen_release` mixin in this package. Do not describe the current panel as consuming clicks.
 
 Preserve the three game-module support modules by moving their source paths under `src/` and declaring corresponding `[[native.module]]` rows. Their destination remains `crates/horizon-client/src/game.rs`.
 
@@ -33,6 +35,8 @@ Preserve the three game-module support modules by moving their source paths unde
 
 - Do not enable world writes in this migration.
 - Keep current preflight read-only and retain the 8192 unique-target cap.
+- Treat reach as a selection-anchor check: at least one selected corner must remain within reach; do not require every target block in a large area to be within reach. Continue validating every target for height, loaded chunk and world border.
+- Keep screen-click handling explicitly non-cancellable until a supported pre-input hook is verified.
 - Keep the Starling source pin, Horizon SDK build pin, game version, and mixins-tool pin as separate identities. The `[native] horizon` field must name a published Horizon SDK build, not the Starling source commit.
 - Run source/layout validation before any native build.
 - Do not rebuild the Starling ARM64 client. Only build the standalone native mod if and when a verified migration is ready.
