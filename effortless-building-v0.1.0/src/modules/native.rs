@@ -267,8 +267,15 @@ impl Game<'_> {
                 // The initial transaction supports only ordinary BlockItem
                 // bindings. Special item subclasses can place fluids, redirect
                 // placement, or perform extra writes outside the preview cell.
-                if behaviours.item_binding(&context.item)
-                    .is_none_or(|binding| binding.kind != ItemKind::Block)
+                let Some(binding) = behaviours.item_binding(&context.item) else {
+                    return None;
+                };
+                // Only accept plain block classes in the first transaction
+                // milestone. Special block classes may run setPlacedBy/onPlace
+                // side effects that placement_preview intentionally does not
+                // model (extra writes, scheduled ticks, or neighbour actions).
+                if binding.kind != ItemKind::Block
+                    || !behaviours.block_data(binding.block).chain.is_empty().not()
                 {
                     return None;
                 }
