@@ -33,7 +33,7 @@ as reference material. They are not the active launcher package.
 
 ## Implemented native integration
 
-- Three injected game support modules and nine native mixin helpers are
+- Three injected game support modules and ten native mixin helpers are
   declared by the SDK 0.2 manifest.
 - Main-hand stick right-click records point A, then point B; a third click
   starts a new pair. Other held items are not claimed.
@@ -79,7 +79,7 @@ the full Starling game crate. It is **not** proof that the launcher-side SDK
 
 Downloaded artifacts were independently checked:
 - The `.hmod` is a valid source ZIP with the expected manifest, Cargo
-  metadata, three modules and nine helper files.
+  metadata, three modules and ten mixin helper files.
 - The Android output is an ELF64 AArch64 `libhorizon_android.so`; its SHA-256
   matches `build.json`.
 - The `.so` is the full Starling Android library with this mod included,
