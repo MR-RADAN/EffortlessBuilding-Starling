@@ -33,7 +33,6 @@ source = "src/modules/runtime.rs"
 [[native.mixin]]
 id = "use"
 kind = "HEAD"
-cancellable = true
 target = "horizon_client::game::starling::native_compat::Game<'_>::native_use_item_old"
 helper = "src/mixins/use.rs"
 bindings = [
