@@ -6,6 +6,8 @@ use super::{Game, GuestUse};
 use horizon_client::command::args::GameMode;
 use horizon_client::first_person::Hand;
 use horizon_client::text::Text;
+use horizon_core::{geometry::{Direction, Vec3}, position::BlockPos};
+use horizon_world::level::PlaceContext;
 use horizon_protocol::packets::play::{self, Clientbound as C};
 use std::collections::BTreeSet;
 
@@ -61,6 +63,10 @@ pub(super) enum NativePreflightError {
     UnsupportedTargetBlock,
     TargetOccupied { index: usize },
     UnresolvedState { index: usize },
+    VanillaPlacementRejected { index: usize },
+    PlacementRedirected { index: usize },
+    PlacementHasCompanion { index: usize },
+    PlacementStateMismatch { index: usize },
 }
 
 /// Drop coordinate-only preview allocations when their owning world session ends.
@@ -124,7 +130,7 @@ impl Game<'_> {
     /// its complete read-only snapshot. Call again after confirmation before
     /// any future write phase. Arbitrary caller-supplied target lists are not accepted.
     pub(super) fn effortless_building_preflight_selection(
-        &self,
+        &mut self,
     ) -> Result<NativePreflightPlan, NativePreflightError> {
         use crate::game::effortless_building as eb;
 
@@ -173,6 +179,7 @@ impl Game<'_> {
                 })
             })
             .ok_or(NativePreflightError::UnsupportedOffhandBlockItem)?;
+        let target_item_name = target_item.item.as_ref().to_owned();
 
         // First write milestone is deliberately limited to blocks whose
         // placement does not create a block entity. The target block's
@@ -229,6 +236,47 @@ impl Game<'_> {
             // Preserve the typed, registry-scoped ID at the native boundary.
             snapshot.push(NativePreflightBlock { pos, before_state: state_id });
         }
+        // Validate air targets with Starling's own BlockItem placement simulator.
+        // The first adapter accepts only property-free, non-block-entity blocks;
+        // companion placements remain unsupported until multi-position rollback exists.
+        let target_facts = self.res.facts().get(target_state);
+        let target_data = self.pack.assets.registry.state(target_state)
+            .ok_or(NativePreflightError::UnsupportedTargetBlock)?;
+        if !target_data.properties.is_empty() || target_facts.block_entity {
+            return Err(NativePreflightError::UnsupportedTargetBlock);
+        }
+        let (yaw, pitch) = self.interaction_rotation();
+        for (index, block) in snapshot.iter().enumerate() {
+            if block.before_state == target_state {
+                continue; // Already-correct blocks are no-ops.
+            }
+            let [x, y, z] = block.pos;
+            let at = BlockPos::new(x, y, z);
+            let context = PlaceContext {
+                clicked_pos: at,
+                face: Direction::Up,
+                hit: Vec3::new(f64::from(x) + 0.5, f64::from(y) + 0.5, f64::from(z) + 0.5),
+                inside: false,
+                yaw,
+                pitch,
+                sneaking: false,
+                item: target_item_name.clone(),
+                can_use_game_master_blocks: false,
+            };
+            let preview = self.with_level(|behaviours, level, ticks| {
+                behaviours.placement_preview(level, ticks, &context)
+            }).ok_or(NativePreflightError::VanillaPlacementRejected { index })?;
+            if preview.pos != at {
+                return Err(NativePreflightError::PlacementRedirected { index });
+            }
+            if preview.companion.is_some() {
+                return Err(NativePreflightError::PlacementHasCompanion { index });
+            }
+            if preview.state != target_state {
+                return Err(NativePreflightError::PlacementStateMismatch { index });
+            }
+        }
+
         Ok(NativePreflightPlan {
             selection,
             tool,
