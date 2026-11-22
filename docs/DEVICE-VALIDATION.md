@@ -7,7 +7,7 @@ configuration recorded in the project notes.
 ## Import and activation
 
 - Confirm the launcher is running Starling 0.9.0 and Android ARM64.
-- Import the generated `effortless_building-0.1.0.hnmod` source package using
+- Import the generated `effortless_building-0.1.0.hmod` source package using
   Starling's supported native build/import flow.
 - Confirm the native library is built for the exact installed APK and its
   SHA-256 is accepted by the launcher.
@@ -35,8 +35,8 @@ configuration recorded in the project notes.
 - Verify the screen does not pause the single-player world.
 - Verify touch input remains compatible with Starling, MCPE and GoyControl;
   no existing touch layout should be rewritten.
-- Test small and large selections, including a selection above 16,384 target
-  positions. The latter must show the cap warning and must never offer a commit.
+- Test small and large selections, including a selection above 8,192 target
+  positions. The latter must be rejected before snapshot allocation and must never offer a commit.
 - Rotate the camera, move away from the selection and return; preview markers
   should remain attached to the selected world coordinates and remain depth
   tested behind opaque terrain.
