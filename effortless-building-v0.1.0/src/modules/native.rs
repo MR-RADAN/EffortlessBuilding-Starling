@@ -275,7 +275,7 @@ impl Game<'_> {
                 // side effects that placement_preview intentionally does not
                 // model (extra writes, scheduled ticks, or neighbour actions).
                 if binding.kind != ItemKind::Block
-                    || !behaviours.block_data(binding.block).chain.is_empty().not()
+                    || !behaviours.block_data(binding.block).chain.is_empty()
                 {
                     return None;
                 }
