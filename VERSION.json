@@ -31,8 +31,8 @@
     "bounded conflict-aware build history",
     "selection-anchor reach preflight validation"
   ],
-  "integration_status": "SDK 0.2 HMOD declares three native modules and nine mixins; main-hand stick records two points; offhand block item resolves material only through exact item/default-state matching; Floor/Pillar/Cube planner and bounded read-only wireframe/sample preview are present; read-only world preflight snapshots and revalidates target states, material, authority, reach anchor, height, loaded chunks and border; world-close resets transient state; no block writes, commit confirmation, live undo/redo or inventory consumption are implemented; screen click uses a non-cancellable Post hook so click suppression is not established",
-  "ci_run": "44974937979",
+  "integration_status": "SDK 0.2 HMOD declares three native modules and ten mixins; main-hand stick records two points; offhand block item resolves material only through exact item/default-state matching; Floor/Pillar/Cube planner and bounded read-only wireframe/sample preview are present; read-only world preflight snapshots and revalidates target states, material, authority, reach anchor, height, loaded chunks and border; world-close resets transient state; no block writes, commit confirmation, live undo/redo or inventory consumption are implemented; screen click uses a non-cancellable Post hook so click suppression is not established",
+  "ci_run": "45022225234",
   "core_tests_run": "44978773735",
   "launcher_import_verified": false,
   "device_runtime_verified": false
