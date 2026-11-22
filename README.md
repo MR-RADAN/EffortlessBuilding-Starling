@@ -22,10 +22,13 @@ This uses the game's own block ray pick and refuses remote multiplayer clients.
 A separate read-only world-render hook draws a selection wireframe plus up to
 64 evenly distributed sample crosses. The screen reports the geometric
 target-position count and flags selections above the 8,192-position native planner
-limit. These previews do not read block states or modify the world. The latest SDK 0.2 workflow validates declared helper syntax, the signed SDK
-pin, manifest, and `.hmod` packaging. It does not type-check injected helpers
-inside the full Starling game crate or validate launcher import; those remain
-separate gates.
+limit. These previews do not read block states or modify the world. CI has two separate validation paths. The SDK 0.2 job validates the
+signed SDK pin, manifest, declared helper files, Rust syntax and `.hmod`
+packaging. A separate Android ARM64 compatibility job adapts that source to
+Starling's legacy mixin build layout and compiles it inside the pinned Starling
+0.9.0 game crate. That integration build passed, but it does not prove the
+launcher-side SDK 0.2 build service accepts this exact HMOD. See
+[the artifact verification report](docs/CI-ARTIFACT-VERIFICATION.md).
 
 ## Implemented in the pure Rust core
 
@@ -85,7 +88,7 @@ This documents the upstream Starling 0.9.0 installation path; it is not a claim 
 - Placement commit, conflict-aware live undo/redo and persistent history.
 - Inventory consumption and authoritative Unlimited Blocks behavior.
 - Runtime testing in Starling 0.9.0 on Android/POCO F5.
-- Type-checking all injected native helper code against the pinned game crate.
+- Launcher-side SDK 0.2 build-service validation for this exact HMOD.
 - Launcher build-service import validation and a tested release package.
 
 See [docs/PORTING-STATUS.md](docs/PORTING-STATUS.md),
