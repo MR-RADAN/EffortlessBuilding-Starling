@@ -2,7 +2,7 @@
 // The screen is a UI-only milestone: tool choice is persisted, but this
 // module still does not read or modify blocks in the world.
 
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Mutex;
 
 pub const ID: &str = "effortless_building";
@@ -11,7 +11,7 @@ pub const VERSION: &str = "0.1.0";
 pub const MAX_BUILD_BLOCKS: u128 = 8_192;
 pub const LARGE_BUILD_WARNING: u128 = 4_096;
 pub const DESCRIPTION: &str =
-    "Mobile-first building tools: Floor, Wall, Pillar and Cube; select two world points with right-click.";
+    "Mobile-first building tools: Floor, Wall, Pillar and Cube; main-hand stick selects points, offhand block selects material.";
 
 pub const TOOLS: [&str; 4] = ["Floor", "Wall", "Pillar", "Cube"];
 pub const ACTION_PREFLIGHT: i32 = 4;
@@ -49,6 +49,7 @@ static SELECTION_POINTS: Mutex<SelectionPoints> = Mutex::new(SelectionPoints {
 /// Record a point from the authoritative in-game block ray pick.
 pub fn record_selection_point(pos: [i32; 3]) {
     SELECTION_POINTS.lock().unwrap_or_else(|e| e.into_inner()).record(pos);
+    clear_preflight_status();
 }
 
 pub fn selection_points() -> SelectionPoints {
@@ -57,6 +58,15 @@ pub fn selection_points() -> SelectionPoints {
 
 pub fn clear_selection_points() {
     *SELECTION_POINTS.lock().unwrap_or_else(|e| e.into_inner()) = SelectionPoints::default();
+    clear_preflight_status();
+}
+
+/// Retire every piece of transient builder state owned by the closing world.
+/// This is intentionally separate from closing/reopening the builder screen.
+pub fn reset_world_session() {
+    clear_selection_points();
+    PENDING_UI_ACTION.store(NO_ACTION, Ordering::Release);
+    crate::game::effortless_building_native::reset_effortless_building_preview();
 }
 
 pub fn selection_block_count_for(selection: SelectionPoints, tool: usize) -> Option<u128> {
@@ -141,6 +151,19 @@ pub fn plan_target_positions(
     Ok(targets)
 }
 
+/// Evenly sample a bounded set of indices across a deterministic plan.
+/// Includes both endpoints whenever more than one marker is requested.
+pub fn sampled_plan_indices(len: usize, cap: usize) -> Vec<usize> {
+    let count = len.min(cap);
+    match count {
+        0 => Vec::new(),
+        1 => vec![0],
+        _ => (0..count)
+            .map(|i| ((i as u128 * (len - 1) as u128) / (count - 1) as u128) as usize)
+            .collect(),
+    }
+}
+
 pub fn selection_label_for_tool(tool: usize) -> String {
     let mut label = selection_label();
     if let Some(count) = selection_block_count(tool) {
@@ -169,12 +192,30 @@ pub fn selection_label() -> String {
 
 const NO_ACTION: i32 = -1;
 static PENDING_UI_ACTION: AtomicI32 = AtomicI32::new(NO_ACTION);
-static PREFLIGHT_STATUS: Mutex<String> = Mutex::new(String::new());
+static PREFLIGHT_STATUS: Mutex<Option<(SelectionPoints, usize, String)>> = Mutex::new(None);
 
-pub fn preflight_status() -> String {
-    PREFLIGHT_STATUS.lock().unwrap_or_else(|e| e.into_inner()).clone()
+pub fn preflight_status_for(selection: SelectionPoints, tool: usize) -> String {
+    PREFLIGHT_STATUS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .as_ref()
+        .filter(|(checked_selection, checked_tool, _)| {
+            *checked_selection == selection && *checked_tool == tool
+        })
+        .map(|(_, _, status)| status.clone())
+        .unwrap_or_default()
 }
-static CAPTURED_LEFT_PRESS: AtomicBool = AtomicBool::new(false);
+
+/// A successful preflight belongs to one exact selection/tool pair.
+/// Mismatched state is never displayed as a current validation result.
+pub fn set_preflight_status(selection: SelectionPoints, tool: usize, status: String) {
+    *PREFLIGHT_STATUS.lock().unwrap_or_else(|e| e.into_inner()) =
+        Some((selection, tool, status));
+}
+
+pub fn clear_preflight_status() {
+    *PREFLIGHT_STATUS.lock().unwrap_or_else(|e| e.into_inner()) = None;
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct UiLayout {
@@ -189,18 +230,20 @@ pub struct UiLayout {
 pub fn selected_tool(read: impl Fn(&str) -> Option<String>) -> usize {
     read("tool")
         .and_then(|s| s.trim().parse::<usize>().ok())
-        .filter(|i| *i < TOOLS.len())
+        .filter(|i| *i < TOOLS.len() && *i != 1)
         .unwrap_or(0)
 }
 
 /// The settings page keeps the four quick selectors and opens the full builder.
 pub fn setting_labels(tool: usize) -> Vec<String> {
-    let selected = tool.min(TOOLS.len() - 1);
+    let selected = if tool < TOOLS.len() && tool != 1 { tool } else { 0 };
     let mut labels: Vec<String> = TOOLS
         .iter()
         .enumerate()
         .map(|(index, name)| {
-            if index == selected {
+            if index == 1 {
+                "[—] Wall (unavailable)".to_owned()
+            } else if index == selected {
                 format!("[x] {name}")
             } else {
                 format!("[ ] {name}")
@@ -262,7 +305,7 @@ pub fn contains(rect: [f32; 4], point: [f32; 2]) -> bool {
 /// Map a screen tap to a tool index or the close action.
 pub fn ui_action_at(layout: &UiLayout, point: [f32; 2]) -> Option<i32> {
     for (index, rect) in layout.tools.iter().enumerate() {
-        if contains(*rect, point) {
+        if index != 1 && contains(*rect, point) {
             return Some(index as i32);
         }
     }
@@ -278,34 +321,32 @@ pub fn queue_ui_action(action: i32) {
     }
 }
 
-pub fn capture_left_press() {
-    CAPTURED_LEFT_PRESS.store(true, Ordering::Release);
-}
-
-pub fn release_captured_left_press() -> bool {
-    CAPTURED_LEFT_PRESS.swap(false, Ordering::AcqRel)
-}
-
 /// Apply UI intent only on the window's Game instance, never on the server tick.
 pub fn process_pending_ui_action(game: &mut crate::game::Game<'_>) {
     if !game.native_window() {
+        // Discard taps queued for a screen that has already closed. Keeping
+        // them would let an old click execute when the builder is reopened.
+        PENDING_UI_ACTION.store(NO_ACTION, Ordering::Release);
+        clear_preflight_status();
         return;
     }
 
     match PENDING_UI_ACTION.swap(NO_ACTION, Ordering::AcqRel) {
-        action if (0..TOOLS.len() as i32).contains(&action) => {
+        action if (0..TOOLS.len() as i32).contains(&action) && action != 1 => {
             game.native_set_setting(ID, "tool", &action.to_string());
+            clear_preflight_status();
         }
         ACTION_PREFLIGHT => {
+            let selection = selection_points();
+            let tool = selected_tool(|key| game.native_setting(ID, key));
             let status = match game.effortless_building_preflight_selection() {
                 Ok(plan) => format!("Preflight OK: {} targets validated; no blocks changed", plan.blocks.len()),
                 Err(error) => format!("Preflight failed: {error:?}"),
             };
-            *PREFLIGHT_STATUS.lock().unwrap_or_else(|e| e.into_inner()) = status;
+            set_preflight_status(selection, tool, status);
         }
         ACTION_CLOSE => {
             game.native_mod_screen_close(ID);
-            CAPTURED_LEFT_PRESS.store(false, Ordering::Release);
         }
         _ => {}
     }
@@ -336,19 +377,22 @@ pub fn draw_screen(
     let selected = selected_tool(|key| game.native_setting(ID, key));
     for (index, rect) in layout.tools.iter().enumerate() {
         let active = index == selected;
+        let unavailable = index == 1;
         game.native_fill(
             batch,
             *rect,
-            if active { 0xFF245B43 } else { 0xFF26394C },
+            if unavailable { 0xFF202830 } else if active { 0xFF245B43 } else { 0xFF26394C },
         );
-        let label = if active {
+        let label = if unavailable {
+            "Wall (soon)".to_owned()
+        } else if active {
             format!("[x] {}", TOOLS[index])
         } else {
             format!("[ ] {}", TOOLS[index])
         };
         let tx = rect[0] + (rect[2] - game.native_text_width(&label)) * 0.5;
         let ty = rect[1] + (rect[3] - 9.0) * 0.5;
-        game.native_text(batch, &label, [tx, ty], 0xFFFFFF, true);
+        game.native_text(batch, &label, [tx, ty], if unavailable { 0x8793A0 } else { 0xFFFFFF }, true);
     }
 
     game.native_fill(batch, layout.preflight, 0xFF245B43);
@@ -370,8 +414,14 @@ pub fn draw_screen(
         0xD6E2EE,
         false,
     );
-    game.native_text(batch, &preflight_status(), [px + 14.0, layout.footer_y], 0xB8C4D0, false);
-    game.native_text(batch, "Hold a stick; close and right-click two blocks to set A and B", [px + 14.0, layout.footer_y + 12.0], 0xB8C4D0, false);
+    game.native_text(
+        batch,
+        &preflight_status_for(selection_points(), selected),
+        [px + 14.0, layout.footer_y],
+        0xB8C4D0,
+        false,
+    );
+    game.native_text(batch, "Main hand: stick to select A/B | Offhand: target block", [px + 14.0, layout.footer_y + 12.0], 0xB8C4D0, false);
 }
 
 #[cfg(test)]
@@ -379,16 +429,35 @@ mod tests {
     use super::*;
 
     #[test]
+    fn preview_samples_are_bounded_evenly_and_cover_both_ends() {
+        assert_eq!(sampled_plan_indices(0, 64), Vec::<usize>::new());
+        assert_eq!(sampled_plan_indices(3, 64), vec![0, 1, 2]);
+        assert_eq!(sampled_plan_indices(100, 1), vec![0]);
+        let indices = sampled_plan_indices(8_192, 64);
+        assert_eq!(indices.len(), 64);
+        assert_eq!(indices.first(), Some(&0));
+        assert_eq!(indices.last(), Some(&8_191));
+        assert!(indices.windows(2).all(|pair| pair[0] < pair[1]));
+        assert!(indices.windows(2).all(|pair| pair[1] - pair[0] <= 131));
+
+        let huge = sampled_plan_indices(usize::MAX, 64);
+        assert_eq!(huge.first(), Some(&0));
+        assert_eq!(huge.last(), Some(&(usize::MAX - 1)));
+        assert!(huge.windows(2).all(|pair| pair[0] < pair[1]));
+    }
+
+    #[test]
     fn settings_have_four_tools_and_builder_button() {
         let labels = setting_labels(2);
         assert_eq!(labels.len(), 5);
-        assert_eq!(&labels[..4], ["[ ] Floor", "[ ] Wall", "[x] Pillar", "[ ] Cube"]);
+        assert_eq!(&labels[..4], ["[ ] Floor", "[—] Wall (unavailable)", "[x] Pillar", "[ ] Cube"]);
         assert_eq!(labels[4], "Open Builder");
     }
 
     #[test]
     fn settings_clamp_invalid_selection() {
         assert_eq!(setting_labels(99)[3], "[x] Cube");
+        assert_eq!(selected_tool(|_| Some("1".to_owned())), 0);
     }
 
     #[test]
@@ -407,6 +476,7 @@ mod tests {
     fn ui_hit_testing_returns_tool_and_close_actions() {
         let layout = ui_layout([0.0, 0.0, 854.0, 480.0]);
         let center = |r: [f32; 4]| [r[0] + r[2] * 0.5, r[1] + r[3] * 0.5];
+        assert_eq!(ui_action_at(&layout, center(layout.tools[1])), None);
         assert_eq!(ui_action_at(&layout, center(layout.tools[2])), Some(2));
         assert_eq!(ui_action_at(&layout, center(layout.close)), Some(ACTION_CLOSE));
         assert_eq!(ui_action_at(&layout, [0.0, 0.0]), None);
@@ -417,6 +487,23 @@ mod tests {
 #[cfg(test)]
 mod selection_point_tests {
     use super::*;
+
+    #[test]
+    fn closing_a_world_retires_selection_preflight_and_queued_ui_action() {
+        let selection = SelectionPoints {
+            first: Some([10, 64, 10]),
+            second: Some([14, 68, 14]),
+        };
+        *SELECTION_POINTS.lock().unwrap_or_else(|e| e.into_inner()) = selection;
+        set_preflight_status(selection, 0, "Preflight OK".to_owned());
+        queue_ui_action(2);
+
+        reset_world_session();
+
+        assert_eq!(selection_points(), SelectionPoints::default());
+        assert!(preflight_status_for(SelectionPoints::default(), 0).is_empty());
+        assert_eq!(PENDING_UI_ACTION.load(Ordering::Acquire), NO_ACTION);
+    }
 
     #[test]
     fn two_points_are_captured_and_third_click_starts_a_new_pair() {

@@ -1,0 +1,2 @@
+//! Effortless Building native mod for Starling 0.9.0.
+//! Private game integration is provided by the pinned native mixins and support modules.

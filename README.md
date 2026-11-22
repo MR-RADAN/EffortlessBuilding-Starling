@@ -11,17 +11,21 @@
 
 This repository contains a Starling 0.9.0 native bundle scaffold, a mobile
 builder tool-selection screen, a pure Rust geometry/transaction core, and
-version-pinned package metadata. The native screen can open, render, select
-Floor/Wall/Pillar/Cube and close while capturing clicks inside its panel.
+version-pinned package metadata. The native screen renderer and mouse-press Post callback are wired against
+Starling 0.9.0. The Post callback has no cancellation parameter, so click
+suppression/consumption is not established; in-game interaction still needs
+verification. Tool selection and close actions are queued from that callback.
 The screen now explains the two-point workflow. With the mod enabled, a
 main-hand right-click while holding a stick records point A, a second records
 point B, and a third starts a new pair. Other held items retain normal use.
 This uses the game's own block ray pick and refuses remote multiplayer clients.
 A separate read-only world-render hook draws a selection wireframe plus up to
 64 evenly distributed sample crosses. The screen reports the geometric
-target-position count and flags selections above the 16,384-position core
-limit. These previews do not read block states or modify the world. The
-selection and render hooks are awaiting native build validation.
+target-position count and flags selections above the 8,192-position native planner
+limit. These previews do not read block states or modify the world. The latest SDK 0.2 workflow validates declared helper syntax, the signed SDK
+pin, manifest, and `.hmod` packaging. It does not type-check injected helpers
+inside the full Starling game crate or validate launcher import; those remain
+separate gates.
 
 ## Implemented in the pure Rust core
 
@@ -48,17 +52,32 @@ live game world.
 
 ## Starling 0.9.0 integration
 
-The native bundle manifest and legacy `.hnmod` source layout follow the
-v0.9.0 importer contract. The native hook scaffold is adapted against the
-pinned source and is being validated by GitHub Actions.
+The active migration branch uses Starling's Native SDK 0.2 manifest and
+versioned `.hmod` source package. The older `.hnmod` bundle is retained only
+as a reference; it is not the SDK 0.2 install artifact. GitHub Actions checks
+the pinned SDK, declared source files, Rust syntax, manifest, and `.hmod`
+packaging. This does not type-check every injected helper inside the game
+crate or prove launcher-side import.
 
-Starling 0.9.0 exposes an authoritative server-side bulk block-edit path and
-bounded column snapshot reads. The required safety contract is documented in
-[docs/WORLD-EDIT-ADAPTER-CONTRACT.md](docs/WORLD-EDIT-ADAPTER-CONTRACT.md).
-The adapter that connects those engine APIs to this mod is not implemented
-yet. Client-side/remote multiplayer edits, implicit chunk loading, and
+The current native mixin follows Starling's in-process Wrench pattern: read-only
+world checks through `Game`, then (when implemented) block behaviour calls
+through `Game::with_level`. The read-only preflight adapter now snapshots and
+revalidates selected target states, but no write path is connected. The required
+safety contract is documented in [docs/WORLD-EDIT-ADAPTER-CONTRACT.md](docs/WORLD-EDIT-ADAPTER-CONTRACT.md). Client-side/remote multiplayer edits, implicit chunk loading, and
 block-entity NBT preservation are explicitly out of scope for the first safe
 implementation.
+
+## Installing the current source in Starling 0.9.0
+
+The supported launcher route is **Mods → Add from GitHub**. Use the repository branch URL:
+
+`https://github.com/MR-RADAN/EffortlessBuilding-Starling/tree/migration/native-sdk-0.2`
+
+Starling's GitHub installer resolves the branch to a commit, scans the source archive for flat native projects, validates the selected package, and installs it. This branch currently contains the native project at `effortless-building-v0.1.0/`; its mod ID is `effortless_building`. Review the resolved source revision and grant native-code permission only if you trust it. Then enable the mod in the selected instance and run **Build** from the Mods page.
+
+The CI-produced `.hmod` is a source package, not an APK or a ready-to-load `.so`. The current workflow artifact is temporary (14-day retention), and this repository does not yet publish a GitHub Release containing the `.hmod` asset. Therefore, use **Add from GitHub** with the branch URL above for the first launcher-side installation test; do not manually copy the ARM64 library into Android storage.
+
+This documents the upstream Starling 0.9.0 installation path; it is not a claim that this specific mod has already passed an on-device install/build/runtime test.
 
 ## Not yet implemented or verified
 
@@ -66,6 +85,7 @@ implementation.
 - Placement commit, conflict-aware live undo/redo and persistent history.
 - Inventory consumption and authoritative Unlimited Blocks behavior.
 - Runtime testing in Starling 0.9.0 on Android/POCO F5.
+- Type-checking all injected native helper code against the pinned game crate.
 - Launcher build-service import validation and a tested release package.
 
 See [docs/PORTING-STATUS.md](docs/PORTING-STATUS.md),

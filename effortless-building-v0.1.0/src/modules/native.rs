@@ -3,6 +3,7 @@
 // preview. It never reads block states or changes the world; the authoritative
 // world-edit adapter is a separate implementation gate.
 use super::{Game, GuestUse};
+use horizon_client::command::args::GameMode;
 use horizon_client::first_person::Hand;
 use horizon_client::text::Text;
 use horizon_protocol::packets::play::{self, Clientbound as C};
@@ -41,6 +42,9 @@ impl NativePreflightBlock {
 pub(super) struct NativePreflightPlan {
     pub selection: crate::game::effortless_building::SelectionPoints,
     pub tool: usize,
+    /// Registry-scoped target state resolved from the offhand block item.
+    /// The selection stick stays in the main hand; the offhand is the material palette.
+    pub target_state: horizon_world::registry::BlockStateId,
     pub blocks: Vec<NativePreflightBlock>,
 }
 
@@ -51,8 +55,16 @@ pub(super) enum NativePreflightError {
     OutsideHeight { index: usize },
     UnloadedChunk { index: usize },
     OutsideBorder { index: usize },
-    OutOfReach { index: usize },
+    NoSelectionCornerInReach,
+    MissingOffhandStack,
+    UnsupportedOffhandBlockItem,
     UnresolvedState { index: usize },
+}
+
+/// Drop coordinate-only preview allocations when their owning world session ends.
+pub(super) fn reset_effortless_building_preview() {
+    PREVIEW_PLAN.with(|cache| *cache.borrow_mut() = None);
+    PREVIEW_LINES.with(|lines| lines.borrow_mut().clear());
 }
 
 impl Game<'_> {
@@ -61,14 +73,18 @@ impl Game<'_> {
     pub(super) fn effortless_building_use(&mut self) -> Option<Option<Hand>> {
         use crate::game::effortless_building as eb;
 
-        if self.remote.is_some()
+        if !self.native_authoritative()
+            || self.remote.is_some()
             || self.player.is_none()
             || self.spectator()
+            || !matches!(self.mode, GameMode::Survival | GameMode::Creative)
             || !self.native_on(eb::ID)
         {
             return None;
         }
-        if self.lan_acting.is_none() && !self.native_window() {
+        // SelectionPoints is process-global; do not let delegated LAN actors
+        // write into the local player's selection or share another actor's points.
+        if self.lan_acting.is_some() || !self.native_window() {
             return None;
         }
         match self.guest_use {
@@ -123,16 +139,61 @@ impl Game<'_> {
         if targets.iter().any(|pos| !seen.insert(*pos)) {
             return Err(NativePreflightError::InvalidPlan);
         }
-        if self.remote.is_some()
+        if !self.native_authoritative()
+            || self.remote.is_some()
             || self.player.is_none()
             || self.spectator()
-            || (self.lan_acting.is_none() && !self.native_window())
+            || !matches!(self.mode, GameMode::Survival | GameMode::Creative)
+            || !self.native_on(eb::ID)
+            || self.lan_acting.is_some()
+            || !self.native_window()
         {
             return Err(NativePreflightError::NotAuthoritativePlayer);
         }
+        // The main hand is reserved for the selection stick. Resolve the
+        // intended material from the offhand block item, without consuming it.
+        // Items without a same-named default block state are rejected rather
+        // than guessed (some item/block mappings are intentionally non-1:1).
+        let target_item = self.offhand.as_ref()
+            .filter(|stack| stack.count > 0)
+            .ok_or(NativePreflightError::MissingOffhandStack)?;
+        let target_state = self.pack.assets.registry
+            .default_state(target_item.item.as_ref())
+            .filter(|state| {
+                self.pack.assets.registry.state(*state).is_some_and(|block| {
+                    // Only accept an exact item-ID/block-ID match. Starling's
+                    // Pick Block path intentionally maps several blocks to
+                    // different items (seeds, crops, stems, potted plants,
+                    // piston heads, etc.); guessing the reverse mapping here
+                    // could place an unrelated block.
+                    block.name.as_str() == target_item.item.as_ref()
+                        && block.name.as_str() != "minecraft:air"
+                })
+            })
+            .ok_or(NativePreflightError::UnsupportedOffhandBlockItem)?;
+
         let layout = self.world.layout();
         let reach = self.reach() + 1.0;
         let eye = self.eye_position();
+        // A and B are selected by the player's ray pick. At preflight time the
+        // player may have walked from A to B, so require at least one corner
+        // to remain in reach rather than incorrectly requiring every target
+        // block in a large cuboid to be within arm's reach.
+        let corner_reachable = |pos: [i32; 3]| {
+            eye.is_some_and(|eye| {
+                let distance_squared: f64 = (0..3)
+                    .map(|axis| (f64::from(pos[axis]) + 0.5 - eye[axis]).powi(2))
+                    .sum();
+                distance_squared <= reach * reach
+            })
+        };
+        if ![selection.first, selection.second]
+            .into_iter()
+            .flatten()
+            .any(corner_reachable)
+        {
+            return Err(NativePreflightError::NoSelectionCornerInReach);
+        }
         let mut snapshot = Vec::with_capacity(targets.len());
         for (index, pos) in targets.iter().copied().enumerate() {
             if pos[1] < layout.min_y() || pos[1] >= layout.max_y() {
@@ -144,16 +205,6 @@ impl Game<'_> {
             if !self.border.contains(f64::from(pos[0]), f64::from(pos[2])) {
                 return Err(NativePreflightError::OutsideBorder { index });
             }
-            let reachable = eye.is_some_and(|eye| {
-                let distance_squared: f64 = (0..3)
-                    .map(|axis| (f64::from(pos[axis]) + 0.5 - eye[axis]).powi(2))
-                    .sum();
-                distance_squared <= reach * reach
-            });
-            if !reachable {
-                return Err(NativePreflightError::OutOfReach { index });
-            }
-
             let state_id = self.world.block(pos[0], pos[1], pos[2]);
             if self.pack.assets.registry.state(state_id).is_none() {
                 return Err(NativePreflightError::UnresolvedState { index });
@@ -164,6 +215,7 @@ impl Game<'_> {
         Ok(NativePreflightPlan {
             selection,
             tool,
+            target_state,
             blocks: snapshot,
         })
     }
@@ -179,10 +231,14 @@ impl Game<'_> {
     ) -> bool {
         use crate::game::effortless_building as eb;
 
-        if self.remote.is_some()
+        if !self.native_authoritative()
+            || self.remote.is_some()
             || self.player.is_none()
             || self.spectator()
-            || (self.lan_acting.is_none() && !self.native_window())
+            || !matches!(self.mode, GameMode::Survival | GameMode::Creative)
+            || !self.native_on(eb::ID)
+            || self.lan_acting.is_some()
+            || !self.native_window()
             || eb::selection_points() != plan.selection
             || eb::selected_tool(|key| self.native_setting(eb::ID, key)) != plan.tool
             || plan.blocks.is_empty()
@@ -191,9 +247,42 @@ impl Game<'_> {
             return false;
         }
 
+        let Some(target_item) = self.offhand.as_ref().filter(|stack| stack.count > 0) else {
+            return false;
+        };
+        let Some(target_state) = self.pack.assets.registry
+            .default_state(target_item.item.as_ref())
+            .filter(|state| {
+                self.pack.assets.registry.state(*state).is_some_and(|block| {
+                    block.name.as_str() == target_item.item.as_ref()
+                        && block.name.as_str() != "minecraft:air"
+                })
+            })
+        else {
+            return false;
+        };
+        if target_state != plan.target_state {
+            return false;
+        }
+
         let layout = self.world.layout();
         let reach = self.reach() + 1.0;
         let eye = self.eye_position();
+        let corner_reachable = |pos: [i32; 3]| {
+            eye.is_some_and(|eye| {
+                let distance_squared: f64 = (0..3)
+                    .map(|axis| (f64::from(pos[axis]) + 0.5 - eye[axis]).powi(2))
+                    .sum();
+                distance_squared <= reach * reach
+            })
+        };
+        if ![plan.selection.first, plan.selection.second]
+            .into_iter()
+            .flatten()
+            .any(corner_reachable)
+        {
+            return false;
+        }
         for block in &plan.blocks {
             let [x, y, z] = block.pos;
             if y < layout.min_y()
@@ -203,18 +292,6 @@ impl Game<'_> {
             {
                 return false;
             }
-            let reachable = eye.is_some_and(|eye| {
-                let distance_squared: f64 = (0..3)
-                    .map(|axis| {
-                        (f64::from(block.pos[axis]) + 0.5 - eye[axis]).powi(2)
-                    })
-                    .sum();
-                distance_squared <= reach * reach
-            });
-            if !reachable {
-                return false;
-            }
-
             let current_state = self.world.block(x, y, z);
             if current_state != block.before_state
                 || self.pack.assets.registry.state(current_state).is_none()
@@ -293,9 +370,7 @@ impl Game<'_> {
 
                 // At most 64 planned positions, evenly sampled across the
                 // complete deterministic plan. Each marker is three short lines.
-                let cap = 64usize.min(plan.len());
-                for i in 0..cap {
-                    let index = if cap == 1 { 0 } else { i * (plan.len() - 1) / (cap - 1) };
+                for index in eb::sampled_plan_indices(plan.len(), 64) {
                     let p = plan[index];
                     let center = [f64::from(p[0]) + 0.5, f64::from(p[1]) + 0.5, f64::from(p[2]) + 0.5];
                     let d = 0.18;

@@ -1,0 +1,229 @@
+name: Check native mod bundle and pinned SDK
+
+on:
+  push:
+    branches:
+      - migration/native-sdk-0.2
+    paths:
+      - "effortless-building-v0.1.0/**"
+      - ".github/workflows/native-sdk-check.yml"
+      - "scripts/adapt_hmod_for_android.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# The branch push is the single source of CI runs for this migration branch.
+# Avoid duplicate push/PR runs cancelling one another while SDK setup is active.
+concurrency:
+  group: native-sdk-check-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  native-sdk-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out mod source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check out the exact Starling 0.9.0 source
+        uses: actions/checkout@v4
+        with:
+          repository: starling-client/starling
+          ref: ff303502a4f7982551a0e0d3622d9268efe9e829
+          path: starling-source
+          persist-credentials: false
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache pinned SDK build dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            starling-source/crates/cargo-horizon-mod -> starling-source/crates/cargo-horizon-mod/target
+
+      - name: Install pinned cargo-horizon-mod CLI
+        # The CLI is a build-time validator/packager, not a shipped runtime
+        # binary; a debug install avoids an expensive release/LTO build.
+        run: cargo install --debug --path starling-source/crates/cargo-horizon-mod --locked
+
+      - name: Validate declared helper files and Rust syntax
+        working-directory: effortless-building-v0.1.0
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import tomllib
+
+          root = pathlib.Path(".")
+          manifest = tomllib.loads((root / "horizon-mod.toml").read_text())
+          native = manifest["native"]
+          declared = [row["source"] for row in native.get("module", [])]
+          declared += [row["helper"] for row in native.get("mixin", [])]
+          if not declared:
+              raise SystemExit("manifest declares no native helper sources")
+          for name in declared:
+              if not (root / name).is_file():
+                  raise SystemExit(f"missing declared native source: {name}")
+          # Validate every Rust source, including src/lib.rs which is the Cargo
+          # crate root but is not a manifest-injected module/helper.
+          rust_sources = sorted(root.rglob("*.rs"))
+          if not rust_sources:
+              raise SystemExit("no Rust source files found")
+          import subprocess
+          for path in rust_sources:
+              print(f"Rust syntax: {path}")
+              subprocess.run(
+                  ["rustfmt", "--edition", "2024", "--emit", "stdout", str(path)],
+                  check=True, stdout=subprocess.DEVNULL,
+              )
+          PY
+
+      - name: Verify lossless HMOD to Android bundle adaptation
+        run: |
+          python3 scripts/adapt_hmod_for_android.py \
+            effortless-building-v0.1.0 "$RUNNER_TEMP/android-mods"
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import tomllib
+
+          source = pathlib.Path("effortless-building-v0.1.0")
+          bundle = pathlib.Path(os.environ["RUNNER_TEMP"]) / "android-mods/effortless_building"
+          old = tomllib.loads((bundle / "horizon-mixin.toml").read_text())
+          new = tomllib.loads((source / "horizon-mod.toml").read_text())
+          injections = old.get("injection", [])
+          modules = old.get("module", [])
+          assert len(injections) == 9, len(injections)
+          assert len(modules) == 3, len(modules)
+          assert {row["id"] for row in injections} == {row["id"] for row in new["native"]["mixin"]}
+          assert {row["id"] for row in modules} == {row["id"] for row in new["native"]["module"]}
+          for row in new["native"]["mixin"]:
+              converted = next(item for item in injections if item["id"] == row["id"])
+              for key in ("kind", "target", "helper", "bindings", "cancellable"):
+                  if key in row:
+                      assert converted[key] == row[key], (row["id"], key)
+          for row in new["native"]["module"]:
+              converted = next(item for item in modules if item["id"] == row["id"])
+              for key in ("file", "name", "source", "visibility"):
+                  if key in row:
+                      assert converted[key] == row[key], (row["id"], key)
+          for row in injections:
+              assert (bundle / row["helper"]).is_file()
+          for row in modules:
+              assert (bundle / row["source"]).is_file()
+          print("Adapter verified: 9/9 mixins, 3/3 modules, bindings and source files preserved.")
+          PY
+
+      - name: Verify signed SDK pin and check mod crate
+        working-directory: effortless-building-v0.1.0
+        run: cargo horizon-mod check
+
+      - name: Package the native source mod
+        working-directory: effortless-building-v0.1.0
+        run: |
+          cargo horizon-mod build
+          test -s target/horizon-mod/effortless_building.hmod
+          mv target/horizon-mod/effortless_building.hmod target/horizon-mod/effortless_building-0.1.0.hmod
+          cargo horizon-mod check target/horizon-mod/effortless_building-0.1.0.hmod
+
+      - name: Upload HMOD package
+        uses: actions/upload-artifact@v4
+        with:
+          name: effortless-building-v0.1.0-hmod
+          path: effortless-building-v0.1.0/target/horizon-mod/effortless_building-0.1.0.hmod
+          if-no-files-found: error
+          retention-days: 14
+
+
+  android-arm64-build:
+    needs: native-sdk-check
+    if: needs.native-sdk-check.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      ABI: arm64-v8a
+      PROFILE: fast
+      NATIVE_LIBRARY_ONLY: "1"
+      CARGO_BUILD_JOBS: "3"
+    steps:
+      - name: Check out mod source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check out the exact Starling 0.9.0 source
+        uses: actions/checkout@v4
+        with:
+          repository: starling-client/starling
+          ref: ff303502a4f7982551a0e0d3622d9268efe9e829
+          path: starling-source
+          persist-credentials: false
+
+      - name: Install Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Install pinned Android SDK, build-tools and NDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
+            "build-tools;35.0.0" "platforms;android-36" "ndk;28.2.13676358" > /dev/null
+
+      - name: Install Rust Android target and rust-src
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+          components: rust-src
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --version 3.5.4 --locked
+
+      - name: Make room for the native release build
+        run: |
+          sudo swapoff -a || true
+          where=/mnt
+          size=20G
+          avail=$(df --output=avail -BG "$where" 2>/dev/null | tail -1 | tr -dc 0-9)
+          if [ "${avail:-0}" -lt 30 ]; then where=$RUNNER_TEMP; size=10G; fi
+          sudo fallocate -l "$size" "$where/starling-release.swap"
+          sudo chmod 600 "$where/starling-release.swap"
+          sudo mkswap "$where/starling-release.swap" > /dev/null
+          sudo swapon "$where/starling-release.swap"
+
+      - name: Convert HMOD and run Starling's real ARM64 native build
+        run: |
+          python3 scripts/adapt_hmod_for_android.py \
+            effortless-building-v0.1.0 "$RUNNER_TEMP/android-mods"
+          test "$(grep -c '^\[\[injection\]\]' "$RUNNER_TEMP/android-mods/effortless_building/horizon-mixin.toml")" -eq 9
+          test "$(grep -c '^\[\[module\]\]' "$RUNNER_TEMP/android-mods/effortless_building/horizon-mixin.toml")" -eq 3
+          NATIVE_LIBRARY_ONLY=1 ABI=arm64-v8a PROFILE=fast \
+            NATIVE_CACHE="$RUNNER_TEMP/starling-native-cache" CARGO_BUILD_JOBS=3 \
+            bash starling-source/packaging/android/native_build.sh \
+              starling-source "$RUNNER_TEMP/native-output" \
+              "$RUNNER_TEMP/android-mods/effortless_building"
+          test -s "$RUNNER_TEMP/native-output/libhorizon_android.so"
+          test -s "$RUNNER_TEMP/native-output/build.json"
+          file "$RUNNER_TEMP/native-output/libhorizon_android.so"
+          readelf -h "$RUNNER_TEMP/native-output/libhorizon_android.so" | grep -E 'Class:|Machine:'
+
+      - name: Upload ARM64 native build and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: effortless-building-v0.1.0-arm64-native
+          path: |
+            ${{ runner.temp }}/native-output/libhorizon_android.so
+            ${{ runner.temp }}/native-output/build.json
+          if-no-files-found: error
+          retention-days: 14
