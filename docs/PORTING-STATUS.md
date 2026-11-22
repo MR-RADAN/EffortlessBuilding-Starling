@@ -39,7 +39,10 @@ as reference material. They are not the active launcher package.
   starts a new pair. Other held items are not claimed.
 - Material selection is read from the offhand block item. The native resolver
   accepts only an exact item-ID/default-block-state match and rejects
-  unsupported or non-1:1 mappings rather than guessing.
+  unsupported or non-1:1 mappings rather than guessing. This identifies a
+  candidate only: it does not yet reproduce vanilla placement context,
+  orientation/half/waterlogging, multiblock placement or block-entity setup.
+  Those candidates must remain blocked from writes until separately handled.
 - The native UI exposes Floor, Pillar and Cube as available tools; Wall is
   explicitly unavailable.
 - A bounded read-only world-space wireframe and up to 64 spatially distributed
