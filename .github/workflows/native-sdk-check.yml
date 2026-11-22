@@ -147,7 +147,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 150
     env:
-      NATIVE_CACHE: ${{ runner.temp }}/starling-native-cache
       ABI: arm64-v8a
       PROFILE: fast
       NATIVE_LIBRARY_ONLY: "1"
@@ -179,7 +178,7 @@ jobs:
 
       - name: Install pinned Android SDK, build-tools and NDK
         run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \\
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
             "build-tools;35.0.0" "platforms;android-36" "ndk;28.2.13676358" > /dev/null
 
       - name: Install Rust Android target and rust-src
@@ -204,14 +203,14 @@ jobs:
 
       - name: Convert HMOD and run Starling's real ARM64 native build
         run: |
-          python3 scripts/adapt_hmod_for_android.py \\
+          python3 scripts/adapt_hmod_for_android.py \
             native/effortless-building-v0.1.0 "$RUNNER_TEMP/android-mods"
-          test "$(grep -c '^\\[\\[injection\\]\\]' "$RUNNER_TEMP/android-mods/effortless_building/horizon-mixin.toml")" -eq 9
-          test "$(grep -c '^\\[\\[module\\]\\]' "$RUNNER_TEMP/android-mods/effortless_building/horizon-mixin.toml")" -eq 3
-          NATIVE_LIBRARY_ONLY=1 ABI=arm64-v8a PROFILE=fast \\
-            NATIVE_CACHE="$NATIVE_CACHE" CARGO_BUILD_JOBS=3 \\
-            bash starling-source/packaging/android/native_build.sh \\
-              starling-source "$RUNNER_TEMP/native-output" \\
+          test "$(grep -c '^\[\[injection\]\]' "$RUNNER_TEMP/android-mods/effortless_building/horizon-mixin.toml")" -eq 9
+          test "$(grep -c '^\[\[module\]\]' "$RUNNER_TEMP/android-mods/effortless_building/horizon-mixin.toml")" -eq 3
+          NATIVE_LIBRARY_ONLY=1 ABI=arm64-v8a PROFILE=fast \
+            NATIVE_CACHE="$RUNNER_TEMP/starling-native-cache" CARGO_BUILD_JOBS=3 \
+            bash starling-source/packaging/android/native_build.sh \
+              starling-source "$RUNNER_TEMP/native-output" \
               "$RUNNER_TEMP/android-mods/effortless_building"
           test -s "$RUNNER_TEMP/native-output/libhorizon_android.so"
           test -s "$RUNNER_TEMP/native-output/build.json"
