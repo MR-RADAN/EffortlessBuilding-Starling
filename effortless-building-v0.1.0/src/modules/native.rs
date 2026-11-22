@@ -222,7 +222,7 @@ impl Game<'_> {
             // replaceable plants, fluids, snow layers, and other soft blocks.
             // Only air is an empty target; an already-correct target is a no-op.
             if state_id != target_state
-                && !self.res.facts().get(state_id).air
+                && state_id != self.res.facts().air
             {
                 return Err(NativePreflightError::TargetOccupied { index });
             }
@@ -315,7 +315,7 @@ impl Game<'_> {
             if current_state != block.before_state
                 || self.pack.assets.registry.state(current_state).is_none()
                 || (current_state != target_state
-                    && !self.res.facts().get(current_state).air)
+                    && current_state != self.res.facts().air)
             {
                 return false;
             }
