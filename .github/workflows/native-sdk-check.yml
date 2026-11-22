@@ -139,3 +139,91 @@ jobs:
           path: native/effortless-building-v0.1.0/target/horizon-mod/effortless_building-0.1.0.hmod
           if-no-files-found: error
           retention-days: 14
+
+
+  android-arm64-build:
+    needs: native-sdk-check
+    if: needs.native-sdk-check.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      NATIVE_CACHE: ${{ runner.temp }}/starling-native-cache
+      ABI: arm64-v8a
+      PROFILE: fast
+      NATIVE_LIBRARY_ONLY: "1"
+      CARGO_BUILD_JOBS: "3"
+    steps:
+      - name: Check out mod source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check out the exact Starling 0.9.0 source
+        uses: actions/checkout@v4
+        with:
+          repository: starling-client/starling
+          ref: ff303502a4f7982551a0e0d3622d9268efe9e829
+          path: starling-source
+          persist-credentials: false
+
+      - name: Install Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Install pinned Android SDK, build-tools and NDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \\
+            "build-tools;35.0.0" "platforms;android-36" "ndk;28.2.13676358" > /dev/null
+
+      - name: Install Rust Android target and rust-src
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+          components: rust-src
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --version 3.5.4 --locked
+
+      - name: Make room for the native release build
+        run: |
+          sudo swapoff -a || true
+          where=/mnt
+          avail=$(df --output=avail -BG "$where" 2>/dev/null | tail -1 | tr -dc 0-9)
+          if [ "${avail:-0}" -lt 30 ]; then where=$RUNNER_TEMP; fi
+          sudo fallocate -l 20G "$where/starling-release.swap"
+          sudo chmod 600 "$where/starling-release.swap"
+          sudo mkswap "$where/starling-release.swap" > /dev/null
+          sudo swapon "$where/starling-release.swap"
+
+      - name: Convert HMOD and run Starling's real ARM64 native build
+        run: |
+          python3 scripts/adapt_hmod_for_android.py \\
+            native/effortless-building-v0.1.0 "$RUNNER_TEMP/android-mods"
+          test "$(grep -c '^\\[\\[injection\\]\\]' "$RUNNER_TEMP/android-mods/effortless_building/horizon-mixin.toml")" -eq 9
+          test "$(grep -c '^\\[\\[module\\]\\]' "$RUNNER_TEMP/android-mods/effortless_building/horizon-mixin.toml")" -eq 3
+          NATIVE_LIBRARY_ONLY=1 ABI=arm64-v8a PROFILE=fast \\
+            NATIVE_CACHE="$NATIVE_CACHE" CARGO_BUILD_JOBS=3 \\
+            bash starling-source/packaging/android/native_build.sh \\
+              starling-source "$RUNNER_TEMP/native-output" \\
+              "$RUNNER_TEMP/android-mods/effortless_building"
+          test -s "$RUNNER_TEMP/native-output/libhorizon_android.so"
+          test -s "$RUNNER_TEMP/native-output/build.json"
+          file "$RUNNER_TEMP/native-output/libhorizon_android.so"
+          readelf -h "$RUNNER_TEMP/native-output/libhorizon_android.so" | grep -E 'Class:|Machine:'
+
+      - name: Upload ARM64 native build and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: effortless-building-v0.1.0-arm64-native
+          path: |
+            ${{ runner.temp }}/native-output/libhorizon_android.so
+            ${{ runner.temp }}/native-output/build.json
+          if-no-files-found: error
+          retention-days: 14
