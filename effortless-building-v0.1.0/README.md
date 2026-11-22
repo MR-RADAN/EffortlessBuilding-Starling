@@ -25,7 +25,7 @@ No world-write path is enabled.
 
 ## Package and build model
 
-- Source directory: `native/effortless-building-v0.1.0/`
+- Source directory: `effortless-building-v0.1.0/`
 - Package filename: `effortless_building-0.1.0.hmod`
 - Package manifest: `horizon-mod.toml`
 - Creator attribution: `authors = ["MR"]`
@@ -39,7 +39,7 @@ For SDK 0.2, the launcher compiles the native source package against the exact p
 After installing the exact compatible Starling/Horizon build in a launcher instance, build this source folder through the SDK 0.2 native pipeline:
 
 ```sh
-horizon-launcher native-build native/effortless-building-v0.1.0 --instance "<instance name>" --trust-native-code
+horizon-launcher native-build effortless-building-v0.1.0 --instance "<instance name>" --trust-native-code
 ```
 
 The launcher performs the native compile/link against that instance's prebuilt game. Native code is unsandboxed and runs with the player's rights; only run a package whose source you have reviewed. A successful build is still not a substitute for checking the UI, selection lifecycle, preview rendering and safety behavior in a real world. World editing must remain disabled until the authoritative edit transaction is separately implemented and tested.
