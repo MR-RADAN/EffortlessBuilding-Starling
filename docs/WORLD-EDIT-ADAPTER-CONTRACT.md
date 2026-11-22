@@ -135,3 +135,26 @@ Reference implementation at the pinned Starling revision:
 - `native-mods/wrench/mixins/wrench/use.rs` — cancellable item-use hook.
 - `crates/horizon-client/src/game.rs` — definitions of `with_level`,
   `level_set_with_flags`, and `process_level_events`.
+
+## Exact placement API discovery — pinned 0.9.0
+
+A further source audit found a higher-level API than the previously documented set_block primitive:
+
+- Behaviours::placement_preview(level, ticks, &PlaceContext) computes the actual BlockItem.place result without writing. Its PlacementPreview includes the final position/state and an optional companion block (doors, beds, tall plants).
+- Behaviours::place_block(level, ticks, &PlaceContext) executes the real placement path: replacement-position resolution, getStateForPlacement, survival checks, entity obstruction, the write, setPlacedBy, and placement sound/event handling. It returns PlaceOutcome.
+
+Both methods are public in the pinned horizon_world::level::Behaviours API and can be called from the injected child module through self.with_level. This is materially safer and more faithful than synthesizing a BlockState and calling set_block directly.
+
+### Consequences for the first commit adapter
+
+1. Construct a deterministic PlaceContext for each intended target and compute placement_preview before any write.
+2. Require the preview's resolved pos to equal the intended target.
+3. Reject any preview with a companion block until the transaction snapshots, validates, accounts for, and safely rolls back every companion position.
+4. Restrict initial supported items/states to a verified whitelist. The existence of vanilla placement logic does not mean every block's placement side effects are safe for bulk use.
+5. Revalidate the complete frozen snapshot immediately before commit, then call place_block on the authoritative acting game and count only PlaceOutcome::Placed results.
+6. Keep the first mutation milestone Creative-only until item consumption, inventory mutation, and survival permission semantics are explicitly implemented. Do not silently grant Survival-mode free blocks.
+7. Keep per-write ledger updates and guarded rollback; a series of individual vanilla placements is not an atomic multi-block transaction.
+
+The adapter still needs to prove that the synthetic click context gives appropriate orientation for each supported block, that neighbour-dependent placement remains deterministic across the planned order, and that no untracked side effect is introduced. Runtime testing remains mandatory.
+
+This discovery supersedes the older note that a generic public placement API had not been found. The current project code is still read-only: no placement calls have been wired into the mod yet.
