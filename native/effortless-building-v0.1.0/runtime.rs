@@ -55,6 +55,28 @@ pub fn selection_points() -> SelectionPoints {
     *SELECTION_POINTS.lock().unwrap_or_else(|e| e.into_inner())
 }
 
+/// Check whether either selected corner remains within the player's interaction
+/// reach. Large build volumes may extend beyond reach; reach applies to the
+/// user-selected anchor, not to every block that will eventually be edited.
+pub fn selection_anchor_reachable(
+    selection: SelectionPoints,
+    eye: [f64; 3],
+    reach: f64,
+) -> bool {
+    if !reach.is_finite() || reach < 0.0 || eye.iter().any(|v| !v.is_finite()) {
+        return false;
+    }
+    [selection.first, selection.second]
+        .into_iter()
+        .flatten()
+        .any(|pos| {
+            let distance_squared: f64 = (0..3)
+                .map(|axis| (f64::from(pos[axis]) + 0.5 - eye[axis]).powi(2))
+                .sum();
+            distance_squared.is_finite() && distance_squared <= reach * reach
+        })
+}
+
 pub fn clear_selection_points() {
     *SELECTION_POINTS.lock().unwrap_or_else(|e| e.into_inner()) = SelectionPoints::default();
 }
@@ -501,5 +523,37 @@ mod selection_count_tests {
             selection_block_count_for(selection, 3),
             Some(1u128 << 96)
         );
+    }
+}
+
+#[cfg(test)]
+mod selection_reach_tests {
+    use super::*;
+
+    #[test]
+    fn either_selected_corner_can_anchor_a_large_build() {
+        let selection = SelectionPoints {
+            first: Some([0, 64, 0]),
+            second: Some([100, 64, 100]),
+        };
+        assert!(selection_anchor_reachable(selection, [0.5, 65.0, 0.5], 6.0));
+    }
+
+    #[test]
+    fn anchor_fails_when_both_corners_are_out_of_reach() {
+        let selection = SelectionPoints {
+            first: Some([20, 64, 20]),
+            second: Some([30, 64, 30]),
+        };
+        assert!(!selection_anchor_reachable(selection, [0.5, 65.0, 0.5], 6.0));
+    }
+
+    #[test]
+    fn incomplete_selection_can_still_use_its_first_corner() {
+        let selection = SelectionPoints {
+            first: Some([0, 64, 0]),
+            second: None,
+        };
+        assert!(selection_anchor_reachable(selection, [0.5, 65.0, 0.5], 6.0));
     }
 }
