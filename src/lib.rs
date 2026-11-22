@@ -1424,3 +1424,187 @@ mod world_preflight_tests {
         );
     }
 }
+
+
+/// A write-ahead record for one bounded world transaction. The native adapter
+/// calls record_applied only after the authoritative world API confirms an
+/// individual position was changed. This deliberately tracks per-position
+/// success instead of assuming an entire tick batch is atomic.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PartialCommit {
+    planned: Vec<BlockChange>,
+    applied: usize,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PartialCommitError {
+    TooManyBlocks,
+    DuplicatePosition,
+    NoOpChange,
+    OutOfOrderConfirmation,
+    AlreadyComplete,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RollbackPlan {
+    /// Safe inverse edits, ordered in reverse application order.
+    pub changes: Vec<BlockChange>,
+    /// Positions deliberately excluded because the world no longer matches
+    /// the state written by this transaction, or a fresh snapshot is missing.
+    pub conflicts: Vec<BlockPos>,
+}
+
+impl PartialCommit {
+    pub fn new(planned: Vec<BlockChange>, cap: usize) -> Result<Self, PartialCommitError> {
+        if planned.len() > cap.min(8_192) {
+            return Err(PartialCommitError::TooManyBlocks);
+        }
+        let mut seen = BTreeSet::new();
+        for change in &planned {
+            if change.before_state == change.after_state {
+                return Err(PartialCommitError::NoOpChange);
+            }
+            if !seen.insert(change.pos) {
+                return Err(PartialCommitError::DuplicatePosition);
+            }
+        }
+        Ok(Self { planned, applied: 0 })
+    }
+
+    /// Confirm exactly the next planned edit after its live write succeeds.
+    /// A failed or skipped write must not advance this ledger.
+    pub fn record_applied(&mut self, index: usize) -> Result<(), PartialCommitError> {
+        if self.applied >= self.planned.len() {
+            return Err(PartialCommitError::AlreadyComplete);
+        }
+        if index != self.applied {
+            return Err(PartialCommitError::OutOfOrderConfirmation);
+        }
+        self.applied += 1;
+        Ok(())
+    }
+
+    pub fn progress(&self) -> (usize, usize) {
+        (self.applied, self.planned.len())
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.applied == self.planned.len()
+    }
+
+    pub fn applied_changes(&self) -> &[BlockChange] {
+        &self.planned[..self.applied]
+    }
+
+    /// Build a conservative rollback from a fresh world snapshot. Only
+    /// positions still equal to this transaction's after_state are reverted;
+    /// player edits or other world changes are preserved and reported.
+    pub fn rollback_plan(&self, current: &[SnapshotBlock]) -> Result<RollbackPlan, GeometryError> {
+        if current.len() > 8_192 {
+            return Err(GeometryError::TooManyBlocks);
+        }
+        let mut states = BTreeMap::new();
+        for block in current {
+            if states.insert(block.pos, block.palette_index).is_some() {
+                return Err(GeometryError::InvalidBatchSize);
+            }
+        }
+
+        let mut changes = Vec::with_capacity(self.applied);
+        let mut conflicts = Vec::new();
+        for change in self.applied_changes().iter().rev() {
+            match states.get(&change.pos) {
+                Some(&state) if state == change.after_state => changes.push(BlockChange {
+                    pos: change.pos,
+                    before_state: change.after_state,
+                    after_state: change.before_state,
+                }),
+                _ => conflicts.push(change.pos),
+            }
+        }
+        Ok(RollbackPlan { changes, conflicts })
+    }
+}
+
+#[cfg(test)]
+mod partial_commit_tests {
+    use super::*;
+
+    fn change(x: i32) -> BlockChange {
+        BlockChange {
+            pos: BlockPos::new(x, 3, 7),
+            before_state: 4,
+            after_state: 9,
+        }
+    }
+
+    #[test]
+    fn ledger_advances_only_for_the_next_confirmed_write() {
+        let mut tx = PartialCommit::new(vec![change(1), change(2)], 8).unwrap();
+        assert_eq!(tx.progress(), (0, 2));
+        assert_eq!(tx.record_applied(1), Err(PartialCommitError::OutOfOrderConfirmation));
+        assert_eq!(tx.progress(), (0, 2));
+        tx.record_applied(0).unwrap();
+        assert_eq!(tx.progress(), (1, 2));
+        tx.record_applied(1).unwrap();
+        assert!(tx.is_complete());
+        assert_eq!(tx.record_applied(2), Err(PartialCommitError::AlreadyComplete));
+    }
+
+    #[test]
+    fn rollback_reverses_only_positions_still_owned_by_the_transaction() {
+        let mut tx = PartialCommit::new(vec![change(1), change(2), change(3)], 8).unwrap();
+        tx.record_applied(0).unwrap();
+        tx.record_applied(1).unwrap();
+        let snapshot = [
+            SnapshotBlock { pos: change(1).pos, palette_index: 9 },
+            // Position 2 was changed by another actor after our write.
+            SnapshotBlock { pos: change(2).pos, palette_index: 12 },
+            // Position 3 was never successfully written.
+            SnapshotBlock { pos: change(3).pos, palette_index: 4 },
+        ];
+        let rollback = tx.rollback_plan(&snapshot).unwrap();
+        assert_eq!(rollback.changes, vec![BlockChange {
+            pos: change(1).pos, before_state: 9, after_state: 4,
+        }]);
+        assert_eq!(rollback.conflicts, vec![change(2).pos]);
+    }
+
+    #[test]
+    fn missing_snapshot_is_a_conflict_not_an_assumed_air_block() {
+        let mut tx = PartialCommit::new(vec![change(1)], 8).unwrap();
+        tx.record_applied(0).unwrap();
+        let rollback = tx.rollback_plan(&[]).unwrap();
+        assert!(rollback.changes.is_empty());
+        assert_eq!(rollback.conflicts, vec![change(1).pos]);
+    }
+
+    #[test]
+    fn ledger_rejects_duplicate_noop_and_oversized_plans() {
+        assert_eq!(
+            PartialCommit::new(vec![change(1), change(1)], 8).err(),
+            Some(PartialCommitError::DuplicatePosition)
+        );
+        assert_eq!(
+            PartialCommit::new(vec![BlockChange {
+                pos: change(1).pos, before_state: 4, after_state: 4,
+            }], 8).err(),
+            Some(PartialCommitError::NoOpChange)
+        );
+        assert_eq!(
+            PartialCommit::new(vec![change(1)], 0).err(),
+            Some(PartialCommitError::TooManyBlocks)
+        );
+    }
+
+    #[test]
+    fn rollback_rejects_ambiguous_duplicate_snapshot_entries() {
+        let mut tx = PartialCommit::new(vec![change(1)], 8).unwrap();
+        tx.record_applied(0).unwrap();
+        let snapshot = [
+            SnapshotBlock { pos: change(1).pos, palette_index: 9 },
+            SnapshotBlock { pos: change(1).pos, palette_index: 9 },
+        ];
+        assert_eq!(tx.rollback_plan(&snapshot), Err(GeometryError::InvalidBatchSize));
+    }
+}
