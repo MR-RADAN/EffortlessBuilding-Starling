@@ -66,7 +66,20 @@ def render_manifest(mod: dict, native: dict) -> tuple[str, list[str]]:
     if not isinstance(version, str) or not version:
         raise ValueError("invalid mod version")
 
-    # native_build.sh replaces this compatibility pin with the exact Starling source commit\n    # after it has exported and stamped that source. Keep the SDK pin separate: native.horizon\n    # identifies the HMOD build SDK, not the game source revision.\n    lines = [\n        "[mod]", f"id = {toml_value(mod_id)}", f"version = {toml_value(version)}", "priority = 100", "",\n        "[compatibility]", f"horizon_revision = {toml_value("0" * 40)}", "",\n    ]
+    # native_build.sh replaces this compatibility pin with the exact Starling source commit
+    # after it has exported and stamped that source. Keep the SDK pin separate: native.horizon
+    # identifies the HMOD build SDK, not the game source revision.
+    placeholder_revision = toml_value("0" * 40)
+    lines = [
+        "[mod]",
+        f"id = {toml_value(mod_id)}",
+        f"version = {toml_value(version)}",
+        "priority = 100",
+        "",
+        "[compatibility]",
+        f"horizon_revision = {placeholder_revision}",
+        "",
+    ]
     referenced: list[str] = []
     seen_ids: set[str] = set()
 
