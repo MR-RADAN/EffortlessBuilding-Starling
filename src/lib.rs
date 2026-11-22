@@ -1277,7 +1277,6 @@ pub struct WorldPreflightInput {
     pub within_height: bool,
     pub chunk_loaded: bool,
     pub inside_border: bool,
-    pub within_reach: bool,
     pub before_state: Option<u32>,
 }
 
@@ -1297,20 +1296,24 @@ pub enum PreflightError {
     OutsideHeight { index: usize },
     UnloadedChunk { index: usize },
     OutsideBorder { index: usize },
-    OutOfReach { index: usize },
+    SelectionOutOfReach,
     UnresolvedState { index: usize },
 }
 
 /// Validate a frozen coordinate list against adapter-supplied world facts.
-/// This function is pure: it performs no world reads, writes, chunk loads or
-/// inventory operations. The adapter must collect one input per target in
-/// exactly the same order and must abort if the live world changes before
-/// the later commit phase.
+/// Reach is checked once against the selected A/B anchor, not against every
+/// target: a valid large build may extend beyond the player's arm's reach.
+/// This function is pure and performs no world reads, writes, chunk loads or
+/// inventory operations.
 pub fn preflight_targets(
     targets: &[BlockPos],
     facts: &[WorldPreflightInput],
+    selection_anchor_within_reach: bool,
     cap: usize,
 ) -> Result<Vec<PreflightBlock>, PreflightError> {
+    if !selection_anchor_within_reach {
+        return Err(PreflightError::SelectionOutOfReach);
+    }
     if targets.len() > cap.min(8_192) {
         return Err(PreflightError::TooManyTargets);
     }
@@ -1336,9 +1339,6 @@ pub fn preflight_targets(
         if !fact.inside_border {
             return Err(PreflightError::OutsideBorder { index });
         }
-        if !fact.within_reach {
-            return Err(PreflightError::OutOfReach { index });
-        }
         let state = fact.before_state.ok_or(PreflightError::UnresolvedState { index })?;
         before.push(PreflightBlock { pos: target, before_state: state });
     }
@@ -1351,8 +1351,11 @@ mod world_preflight_tests {
 
     fn fact(pos: BlockPos) -> WorldPreflightInput {
         WorldPreflightInput {
-            pos, within_height: true, chunk_loaded: true,
-            inside_border: true, within_reach: true, before_state: Some(17),
+            pos,
+            within_height: true,
+            chunk_loaded: true,
+            inside_border: true,
+            before_state: Some(17),
         }
     }
 
@@ -1360,7 +1363,7 @@ mod world_preflight_tests {
     fn preflight_returns_compact_snapshots_only_when_all_targets_pass() {
         let targets = [BlockPos::new(1, 2, 3), BlockPos::new(-4, 5, 6)];
         let facts = [fact(targets[0]), fact(targets[1])];
-        assert_eq!(preflight_targets(&targets, &facts, 8), Ok(vec![
+        assert_eq!(preflight_targets(&targets, &facts, true, 8), Ok(vec![
             PreflightBlock { pos: targets[0], before_state: 17 },
             PreflightBlock { pos: targets[1], before_state: 17 },
         ]));
@@ -1371,20 +1374,22 @@ mod world_preflight_tests {
         let p = BlockPos::new(0, 4, 0);
         let mut f = fact(p);
         f.chunk_loaded = false;
-        assert_eq!(preflight_targets(&[p], &[f], 8), Err(PreflightError::UnloadedChunk { index: 0 }));
+        assert_eq!(
+            preflight_targets(&[p], &[f], true, 8),
+            Err(PreflightError::UnloadedChunk { index: 0 })
+        );
     }
 
     #[test]
     fn preflight_rejects_each_invalid_world_fact() {
         let p = BlockPos::new(0, 4, 0);
         let cases = [
-            (WorldPreflightInput { within_height:false, ..fact(p) }, PreflightError::OutsideHeight { index:0 }),
-            (WorldPreflightInput { inside_border:false, ..fact(p) }, PreflightError::OutsideBorder { index:0 }),
-            (WorldPreflightInput { within_reach:false, ..fact(p) }, PreflightError::OutOfReach { index:0 }),
-            (WorldPreflightInput { before_state:None, ..fact(p) }, PreflightError::UnresolvedState { index:0 }),
+            (WorldPreflightInput { within_height: false, ..fact(p) }, PreflightError::OutsideHeight { index: 0 }),
+            (WorldPreflightInput { inside_border: false, ..fact(p) }, PreflightError::OutsideBorder { index: 0 }),
+            (WorldPreflightInput { before_state: None, ..fact(p) }, PreflightError::UnresolvedState { index: 0 }),
         ];
         for (input, expected) in cases {
-            assert_eq!(preflight_targets(&[p], &[input], 8), Err(expected));
+            assert_eq!(preflight_targets(&[p], &[input], true, 8), Err(expected));
         }
     }
 
@@ -1392,14 +1397,30 @@ mod world_preflight_tests {
     fn preflight_rejects_mismatched_or_duplicate_inputs() {
         let a = BlockPos::new(0, 0, 0);
         let b = BlockPos::new(1, 0, 0);
-        assert_eq!(preflight_targets(&[a], &[], 8), Err(PreflightError::CountMismatch));
-        assert_eq!(preflight_targets(&[a], &[fact(b)], 8), Err(PreflightError::PositionMismatch { index:0 }));
-        assert_eq!(preflight_targets(&[a, a], &[fact(a), fact(a)], 8), Err(PreflightError::DuplicateTarget { index:1 }));
+        assert_eq!(preflight_targets(&[a], &[], true, 8), Err(PreflightError::CountMismatch));
+        assert_eq!(preflight_targets(&[a], &[fact(b)], true, 8), Err(PreflightError::PositionMismatch { index: 0 }));
+        assert_eq!(preflight_targets(&[a, a], &[fact(a), fact(a)], true, 8), Err(PreflightError::DuplicateTarget { index: 1 }));
+    }
+
+    #[test]
+    fn preflight_checks_reach_on_the_selection_anchor_not_each_target() {
+        let near = BlockPos::new(0, 64, 0);
+        let far = BlockPos::new(100, 64, 100);
+        let targets = [near, far];
+        let facts = [fact(near), fact(far)];
+        assert!(preflight_targets(&targets, &facts, true, 8).is_ok());
+        assert_eq!(
+            preflight_targets(&targets, &facts, false, 8),
+            Err(PreflightError::SelectionOutOfReach)
+        );
     }
 
     #[test]
     fn preflight_enforces_cap_before_processing() {
         let p = BlockPos::new(0, 0, 0);
-        assert_eq!(preflight_targets(&[p], &[fact(p)], 0), Err(PreflightError::TooManyTargets));
+        assert_eq!(
+            preflight_targets(&[p], &[fact(p)], true, 0),
+            Err(PreflightError::TooManyTargets)
+        );
     }
 }
