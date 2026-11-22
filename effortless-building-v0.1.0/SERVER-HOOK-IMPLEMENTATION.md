@@ -1,5 +1,7 @@
 # World-edit adapter — Starling 0.9.0
 
+> **Historical reference:** This file began as implementation notes for the legacy `.hnmod`/horizon-mixins route. The active branch now packages the project as a Native SDK 0.2 `.hmod`; follow [MIGRATION-SDK-0.2.md](MIGRATION-SDK-0.2.md) and [the CI artifact verification report](../docs/CI-ARTIFACT-VERIFICATION.md) for current packaging/build status. The source below remains useful for the pinned Starling in-process world-edit API investigation, but statements about the current package format and earlier unresolved material lookup are superseded by the SDK migration and current source.
+
 Creator: MR  
 Mod version: 0.1.0  
 Target revision: `ff303502a4f7982551a0e0d3622d9268efe9e829`
@@ -332,3 +334,21 @@ the boundary type-safe without inventing a cross-crate call. Direct execution
 of `preflight_targets` remains blocked on explicit build/importer wiring.
 No world writes, confirmation action, or inventory handling were added.
 Compile and device tests remain unrun.
+
+
+## SDK 0.2 branch status update — 2026-11-22
+
+The active SDK 0.2 source resolves the offhand material conservatively: it
+uses the offhand item's canonical identifier with the pinned registry's
+`default_state` lookup, then accepts the result only when the resolved block
+identifier exactly matches the item identifier and is not air. Unsupported
+or non-1:1 item/block mappings are rejected; no guessed numeric registry
+slot is used.
+
+The current native preflight also:
+- requires local authoritative single-player mode, not a remote server client or delegated LAN actor;
+- requires at least one selected corner to remain within player reach, rather than requiring every target block in a large volume to be reachable;
+- checks every target's Y range, loaded-chunk state, world border, and resolvable before-state;
+- revalidates the same selection, tool, offhand material, authority, and before-states before a future write phase.
+
+These are still read-only checks. There is no bulk placement, commit, live undo/redo, inventory consumption, or block-entity preservation implementation in the active SDK 0.2 source. The successful ARM64 CI integration compile is not a runtime test, and launcher-side SDK 0.2 build-service validation remains outstanding.

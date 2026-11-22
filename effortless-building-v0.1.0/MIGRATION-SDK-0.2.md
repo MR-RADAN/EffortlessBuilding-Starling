@@ -39,7 +39,10 @@ Preserve the three game-module support modules by moving their source paths unde
 - Keep screen-click handling explicitly non-cancellable until a supported pre-input hook is verified.
 - Keep the Starling source pin, Horizon SDK build pin, game version, and mixins-tool pin as separate identities. The `[native] horizon` field must name a published Horizon SDK build, not the Starling source commit.
 - Run source/layout validation before any native build.
-- Do not rebuild the Starling ARM64 client. Only build the standalone native mod if and when a verified migration is ready.
+- Keep SDK 0.2 source-package validation and Android ARM64 integration compilation as separate gates.
+- The Android ARM64 CI job currently adapts the SDK 0.2 source into Starling's legacy native-mixin bundle layout, then runs the pinned Starling 0.9.0 `native_build.sh`. This type-checks the injected helpers inside the full Starling game crate and builds the Android ARM64 library with the mod included.
+- That compatibility build does **not** prove that the launcher accepts or builds this exact SDK 0.2 `.hmod` through its own build service. Launcher-side import/build validation remains a separate gate.
+- The resulting `libhorizon_android.so` is the full Starling Android library with the mod integrated, not a standalone mod library. Do not ask users to copy it manually. The `.hmod` remains the source package intended for the launcher.
 - Confirm the produced package is `.hmod` and validate its manifest/layout; do not label the prior ARM64 ZIP as an importable mod package.
 
 ## Migration implementation status
@@ -56,3 +59,14 @@ The legacy `horizon-mixin.toml` and root-level Rust files remain as reference; t
 ## World-session state retirement
 
 The pinned Starling 0.9.0 source confirms that `Game::finish_close_world(&mut self) -> Result<()>` is the final client-world teardown path. The SDK migration adds a HEAD mixin at that exact method. It calls `reset_world_session()` before the engine releases the active world, clearing the process-global A/B selection, any preflight status, any queued builder UI action, and the coordinate-only preview cache. This hook is deliberately not tied to `native_window()` or the builder screen lifecycle: closing/reopening the panel in the same world keeps the selection, while closing the world retires it. The reset is conservative and also runs on the remote-client leave path before the engine's early return. The source helper and manifest are covered by the native SDK workflow's declared-file and Rust-syntax checks; full injected-helper type-checking and device verification remain separate gates.
+
+
+## Verified CI artifacts — 2026-11-22
+
+Workflow run [44974937979](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44974937979) completed successfully on the SDK 0.2 branch. Both jobs passed:
+- `native-sdk-check`: signed SDK pin, manifest, declared source files, syntax checks, and `.hmod` package validation.
+- `android-arm64-build`: compatibility-adapted native integration build against the exact pinned Starling 0.9.0 source.
+
+The downloaded `.hmod` and ARM64 library were independently inspected. The HMOD is a valid source ZIP with the expected manifest and Rust helper/module files. The ARM64 output is an ELF64 AArch64 shared library, and its SHA-256 matches the build manifest. The library includes Starling plus this mod; it is not a standalone mod artifact.
+
+The detailed file-level checks, hashes, package contents, and limitations are recorded in [docs/CI-ARTIFACT-VERIFICATION.md](../docs/CI-ARTIFACT-VERIFICATION.md). These results establish package integrity and compatibility-build success, not launcher-side SDK 0.2 import or on-device runtime behavior.
