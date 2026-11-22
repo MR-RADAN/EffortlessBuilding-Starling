@@ -7,7 +7,7 @@ use horizon_client::command::args::GameMode;
 use horizon_client::first_person::Hand;
 use horizon_client::text::Text;
 use horizon_core::{geometry::{Direction, Vec3}, position::BlockPos};
-use horizon_world::level::PlaceContext;
+use horizon_world::level::{ItemKind, PlaceContext};
 use horizon_protocol::packets::play::{self, Clientbound as C};
 use std::collections::BTreeSet;
 
@@ -264,6 +264,14 @@ impl Game<'_> {
                 can_use_game_master_blocks: false,
             };
             let preview = self.with_level(|behaviours, level, ticks| {
+                // The initial transaction supports only ordinary BlockItem
+                // bindings. Special item subclasses can place fluids, redirect
+                // placement, or perform extra writes outside the preview cell.
+                if behaviours.item_binding(&context.item)
+                    .is_none_or(|binding| binding.kind != ItemKind::Block)
+                {
+                    return None;
+                }
                 behaviours.placement_preview(level, ticks, &context)
             }).ok_or(NativePreflightError::VanillaPlacementRejected { index })?;
             if preview.pos != at {
