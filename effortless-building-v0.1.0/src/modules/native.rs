@@ -47,6 +47,10 @@ pub(super) struct NativePreflightPlan {
     /// Registry-scoped target state resolved from the offhand block item.
     /// The selection stick stays in the main hand; the offhand is the material palette.
     pub target_state: horizon_world::registry::BlockStateId,
+    /// Exact item identity and vanilla placement inputs captured at preflight.
+    /// Contexts are None only for positions already containing target_state.
+    pub target_item: String,
+    pub placement_contexts: Vec<Option<PlaceContext>>,
     pub blocks: Vec<NativePreflightBlock>,
 }
 
@@ -246,8 +250,10 @@ impl Game<'_> {
             return Err(NativePreflightError::UnsupportedTargetBlock);
         }
         let (yaw, pitch) = self.interaction_rotation();
+        let mut placement_contexts = Vec::with_capacity(snapshot.len());
         for (index, block) in snapshot.iter().enumerate() {
             if block.before_state == target_state {
+                placement_contexts.push(None);
                 continue; // Already-correct blocks are no-ops.
             }
             let [x, y, z] = block.pos;
@@ -290,12 +296,15 @@ impl Game<'_> {
             if preview.state != target_state {
                 return Err(NativePreflightError::PlacementStateMismatch { index });
             }
+            placement_contexts.push(Some(context));
         }
 
         Ok(NativePreflightPlan {
             selection,
             tool,
             target_state,
+            target_item: target_item_name,
+            placement_contexts,
             blocks: snapshot,
         })
     }
@@ -306,7 +315,7 @@ impl Game<'_> {
     /// This is deliberately read-only: it rejects stale selection, authority,
     /// world bounds, reach, unloaded chunks, and any block changed since capture.
     pub(super) fn effortless_building_preflight_is_current(
-        &self,
+        &mut self,
         plan: &NativePreflightPlan,
     ) -> bool {
         use crate::game::effortless_building as eb;
@@ -323,6 +332,7 @@ impl Game<'_> {
             || eb::selected_tool(|key| self.native_setting(eb::ID, key)) != plan.tool
             || plan.blocks.is_empty()
             || plan.blocks.len() > 8_192
+            || plan.placement_contexts.len() != plan.blocks.len()
         {
             return false;
         }
@@ -342,8 +352,13 @@ impl Game<'_> {
             return false;
         };
         if target_state != plan.target_state
+            || target_item.item.as_ref() != plan.target_item
             || self.res.facts().get(target_state).block_entity
         {
+            return false;
+        }
+        let target_data = self.pack.assets.registry.state(target_state);
+        if target_data.is_none_or(|data| !data.properties.is_empty()) {
             return false;
         }
 
@@ -365,7 +380,7 @@ impl Game<'_> {
         {
             return false;
         }
-        for block in &plan.blocks {
+        for (index, block) in plan.blocks.iter().enumerate() {
             let [x, y, z] = block.pos;
             if y < layout.min_y()
                 || y >= layout.max_y()
@@ -381,6 +396,38 @@ impl Game<'_> {
                     && current_state != self.res.facts().air)
             {
                 return false;
+            }
+
+            match (&plan.placement_contexts[index], current_state == target_state) {
+                (None, true) => {}
+                (Some(context), false) if current_state == self.res.facts().air => {
+                    // Re-run the exact frozen vanilla placement query. Do not
+                    // rebuild yaw/pitch or click data from the player's current view.
+                    if context.item != plan.target_item
+                        || context.clicked_pos != BlockPos::new(x, y, z)
+                    {
+                        return false;
+                    }
+                    let preview = self.with_level(|behaviours, level, ticks| {
+                        let Some(binding) = behaviours.item_binding(&context.item) else {
+                            return None;
+                        };
+                        if binding.kind != ItemKind::Block
+                            || !behaviours.block_data(binding.block).chain.is_empty()
+                        {
+                            return None;
+                        }
+                        behaviours.placement_preview(level, ticks, context)
+                    });
+                    let Some(preview) = preview else { return false; };
+                    if preview.pos != context.clicked_pos
+                        || preview.state != plan.target_state
+                        || preview.companion.is_some()
+                    {
+                        return false;
+                    }
+                }
+                _ => return false,
             }
         }
         true
