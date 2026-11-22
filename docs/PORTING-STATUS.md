@@ -58,6 +58,7 @@ as reference material. They are not the active launcher package.
 
 ## CI verification
 
+- Standalone Rust core regression workflow [44978773735](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44978773735) passed on the migration branch: **60 passed, 0 failed**. This includes the new regression proving reach is checked against the selected anchor rather than every target block.
 Workflow run [44974937979](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44974937979)
 completed successfully on `migration/native-sdk-0.2`:
 

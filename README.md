@@ -53,6 +53,9 @@ launcher-side SDK 0.2 build service accepts this exact HMOD. See
 These are pure planning routines. They do not themselves read or modify the
 live game world.
 
+The standalone core regression suite passes 60 tests on the SDK migration
+branch ([run 44978773735](https://github.com/MR-RADAN/EffortlessBuilding-Starling/actions/runs/44978773735)).
+
 ## Starling 0.9.0 integration
 
 The active migration branch uses Starling's Native SDK 0.2 manifest and
