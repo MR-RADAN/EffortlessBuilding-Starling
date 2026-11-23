@@ -337,14 +337,14 @@ fn append_diagnostic(game: &crate::game::Game<'_>, level: &str, stage: &str, mes
 
     let now = SystemTime::now().duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs()).unwrap_or(0);
-    let line = format!("{now} [{level}] {stage}: {}\n", message.replace(['\\n', '\\r'], " "));
+    let line = format!("{now} [{level}] {stage}: {}\n", message.replace(['\n', '\r'], " "));
     let Ok(path) = ConfigPath::new(DIAGNOSTIC_FILE) else { return; };
     let files = Host::data_files(game);
     let mut contents = files.read(&path).unwrap_or_default();
     contents.extend_from_slice(line.as_bytes());
     if contents.len() > DIAGNOSTIC_MAX_BYTES {
         let keep_from = contents.len() - DIAGNOSTIC_MAX_BYTES;
-        let boundary = contents[keep_from..].iter().position(|b| *b == b'\\n')
+        let boundary = contents[keep_from..].iter().position(|b| *b == b'\n')
             .map(|i| keep_from + i + 1).unwrap_or(keep_from);
         contents.drain(..boundary);
     }
