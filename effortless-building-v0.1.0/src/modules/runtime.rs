@@ -332,14 +332,15 @@ const DIAGNOSTIC_MAX_BYTES: usize = 64 * 1024;
 /// Append a bounded, local-only diagnostic record to this mod's private data root.
 /// The Host file service validates paths and replaces the file atomically.
 fn append_diagnostic(game: &crate::game::Game<'_>, level: &str, stage: &str, message: &str) {
-    use crate::mod_api::{ConfigPath, Host};
+    use crate::mod_api::ConfigPath;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     let now = SystemTime::now().duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs()).unwrap_or(0);
-    let line = format!("{now} [{level}] {stage}: {}\n", message.replace(['\n', '\r'], " "));
+    let sanitized = message.replace('\n', " ").replace('\r', " ");
+    let line = format!("{now} [{level}] {stage}: {sanitized}\n");
     let Ok(path) = ConfigPath::new(DIAGNOSTIC_FILE) else { return; };
-    let files = Host::data_files(game);
+    let files = crate::game::Game::data_files();
     let mut contents = match files.stat(&path) {
         Ok(Some(stat)) if stat.len as usize <= DIAGNOSTIC_MAX_BYTES => {
             files.read(&path).unwrap_or_default()
