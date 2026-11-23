@@ -49,6 +49,7 @@ static SELECTION_POINTS: Mutex<SelectionPoints> = Mutex::new(SelectionPoints {
 /// Record a point from the authoritative in-game block ray pick.
 pub fn record_selection_point(pos: [i32; 3]) {
     SELECTION_POINTS.lock().unwrap_or_else(|e| e.into_inner()).record(pos);
+    crate::game::effortless_building_native::clear_effortless_building_preflight();
     clear_preflight_status();
 }
 
@@ -58,6 +59,7 @@ pub fn selection_points() -> SelectionPoints {
 
 pub fn clear_selection_points() {
     *SELECTION_POINTS.lock().unwrap_or_else(|e| e.into_inner()) = SelectionPoints::default();
+    crate::game::effortless_building_native::clear_effortless_building_preflight();
     clear_preflight_status();
 }
 
@@ -335,14 +337,20 @@ pub fn process_pending_ui_action(game: &mut crate::game::Game<'_>) {
 
     match PENDING_UI_ACTION.swap(NO_ACTION, Ordering::AcqRel) {
         action if (0..TOOLS.len() as i32).contains(&action) && action != 1 => {
+            crate::game::effortless_building_native::clear_effortless_building_preflight();
             game.native_set_setting(ID, "tool", &action.to_string());
             clear_preflight_status();
         }
         ACTION_PREFLIGHT => {
             let selection = selection_points();
             let tool = selected_tool(|key| game.native_setting(ID, key));
+            crate::game::effortless_building_native::clear_effortless_building_preflight();
             let status = match game.effortless_building_preflight_selection() {
-                Ok(plan) => format!("Preflight OK: {} targets validated; no blocks changed", plan.blocks.len()),
+                Ok(plan) => {
+                    let count = plan.blocks.len();
+                    crate::game::effortless_building_native::store_effortless_building_preflight(plan);
+                    format!("Preflight OK: {count} targets frozen; no blocks changed")
+                }
                 Err(error) => format!("Preflight failed: {error:?}"),
             };
             set_preflight_status(selection, tool, status);
