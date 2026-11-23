@@ -623,3 +623,23 @@ mod selection_reach_tests {
         assert!(selection_anchor_reachable(selection, [0.5, 65.0, 0.5], 6.0));
     }
 }
+
+
+#[cfg(test)]
+mod diagnostic_format_tests {
+    use super::*;
+
+    #[test]
+    fn diagnostic_json_escaping_keeps_records_single_line() {
+        assert_eq!(
+            json_escape("quote: \" slash: \\ line:\nnext\tend"),
+            "quote: \\\" slash: \\\\ line:\\nnext\\tend"
+        );
+    }
+
+    #[test]
+    fn diagnostic_detail_is_bounded_before_serialization() {
+        let long = "x".repeat(4096);
+        assert_eq!(long.chars().take(2048).count(), 2048);
+    }
+}
