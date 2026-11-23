@@ -129,6 +129,7 @@ impl Game<'_> {
         let pos = hit.pos;
         let recorded = self.with_player_actor(|game| {
             eb::record_selection_point(pos);
+            eb::log_selection_event(game);
             // Give immediate feedback so touch/right-click input can be
             // distinguished from a silent no-op on mobile.
             let label = eb::selection_label();
