@@ -9,6 +9,7 @@ fn effortless_building_settings_click(
     }
 
     if button < m::TOOLS.len() && button != 1 {
+        crate::game::effortless_building_native::clear_effortless_building_preflight();
         game.native_set_setting(m::ID, "tool", &button.to_string());
     } else if button == m::TOOLS.len() {
         let _ = game.native_mod_screen_open(m::ID);
