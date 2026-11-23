@@ -326,6 +326,35 @@ pub fn queue_ui_action(action: i32) {
 }
 
 /// Apply UI intent only on the window's Game instance, never on the server tick.
+const DIAGNOSTIC_FILE: &str = "diagnostics.log";
+const DIAGNOSTIC_MAX_BYTES: usize = 64 * 1024;
+
+/// Append a bounded, local-only diagnostic record to this mod's private data root.
+/// The Host file service validates paths and replaces the file atomically.
+fn append_diagnostic(game: &crate::game::Game<'_>, level: &str, stage: &str, message: &str) {
+    use crate::mod_api::{ConfigPath, Host};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs()).unwrap_or(0);
+    let line = format!("{now} [{level}] {stage}: {}\n", message.replace(['\\n', '\\r'], " "));
+    let Ok(path) = ConfigPath::new(DIAGNOSTIC_FILE) else { return; };
+    let files = Host::data_files(game);
+    let mut contents = files.read(&path).unwrap_or_default();
+    contents.extend_from_slice(line.as_bytes());
+    if contents.len() > DIAGNOSTIC_MAX_BYTES {
+        let keep_from = contents.len() - DIAGNOSTIC_MAX_BYTES;
+        let boundary = contents[keep_from..].iter().position(|b| *b == b'\\n')
+            .map(|i| keep_from + i + 1).unwrap_or(keep_from);
+        contents.drain(..boundary);
+    }
+    if let Err(error) = files.write(&path, &contents) {
+        // Do not recursively log a logging failure. Keep the failure visible
+        // in the game's native log for diagnosis.
+        log::warn!("Effortless Building: could not write diagnostics.log: {error}");
+    }
+}
+
 pub fn process_pending_ui_action(game: &mut crate::game::Game<'_>) {
     if !game.native_window() {
         // Discard taps queued for a screen that has already closed. Keeping
@@ -340,18 +369,24 @@ pub fn process_pending_ui_action(game: &mut crate::game::Game<'_>) {
             crate::game::effortless_building_native::clear_effortless_building_preflight();
             game.native_set_setting(ID, "tool", &action.to_string());
             clear_preflight_status();
+            append_diagnostic(game, "INFO", "tool", "builder tool changed");
         }
         ACTION_PREFLIGHT => {
             let selection = selection_points();
             let tool = selected_tool(|key| game.native_setting(ID, key));
             crate::game::effortless_building_native::clear_effortless_building_preflight();
+            append_diagnostic(game, "INFO", "preflight", "validation started");
             let status = match game.effortless_building_preflight_selection() {
                 Ok(plan) => {
                     let count = plan.blocks.len();
                     crate::game::effortless_building_native::store_effortless_building_preflight(plan);
+                    append_diagnostic(game, "INFO", "preflight", &format!("validation succeeded; {count} targets frozen; no world changes"));
                     format!("Preflight OK: {count} targets frozen; no blocks changed")
                 }
-                Err(error) => format!("Preflight failed: {error:?}"),
+                Err(error) => {
+                    append_diagnostic(game, "ERROR", "preflight", &format!("validation failed: {error:?}"));
+                    format!("Preflight failed: {error:?}")
+                }
             };
             set_preflight_status(selection, tool, status);
         }
