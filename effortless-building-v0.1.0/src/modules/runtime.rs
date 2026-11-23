@@ -361,7 +361,19 @@ fn append_diagnostic(game: &crate::game::Game<'_>, level: &str, stage: &str, mes
     }
 }
 
-/// Record selection progress without writing block coordinates to the log.\npub(super) fn log_selection_event(game: &crate::game::Game<'_>) {\n    let selection = selection_points();\n    let stage = if selection.second.is_some() { "point_b" } else { "point_a" };\n    let message = if selection.second.is_some() { "second selection point recorded" } else { "selection point recorded; awaiting second point" };\n    append_diagnostic(game, "INFO", stage, message);\n}\n\npub fn process_pending_ui_action(game: &mut crate::game::Game<'_>) {
+/// Record selection progress without writing block coordinates to the log.
+pub(super) fn log_selection_event(game: &crate::game::Game<'_>) {
+    let selection = selection_points();
+    let stage = if selection.second.is_some() { "point_b" } else { "point_a" };
+    let message = if selection.second.is_some() {
+        "second selection point recorded"
+    } else {
+        "selection point recorded; awaiting second point"
+    };
+    append_diagnostic(game, "INFO", stage, message);
+}
+
+pub fn process_pending_ui_action(game: &mut crate::game::Game<'_>) {
     if !game.native_window() {
         // Discard taps queued for a screen that has already closed. Keeping
         // them would let an old click execute when the builder is reopened.
