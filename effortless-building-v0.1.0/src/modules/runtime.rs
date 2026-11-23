@@ -340,7 +340,12 @@ fn append_diagnostic(game: &crate::game::Game<'_>, level: &str, stage: &str, mes
     let line = format!("{now} [{level}] {stage}: {}\n", message.replace(['\n', '\r'], " "));
     let Ok(path) = ConfigPath::new(DIAGNOSTIC_FILE) else { return; };
     let files = Host::data_files(game);
-    let mut contents = files.read(&path).unwrap_or_default();
+    let mut contents = match files.stat(&path) {
+        Ok(Some(stat)) if stat.len as usize <= DIAGNOSTIC_MAX_BYTES => {
+            files.read(&path).unwrap_or_default()
+        }
+        _ => Vec::new(),
+    };
     contents.extend_from_slice(line.as_bytes());
     if contents.len() > DIAGNOSTIC_MAX_BYTES {
         let keep_from = contents.len() - DIAGNOSTIC_MAX_BYTES;
