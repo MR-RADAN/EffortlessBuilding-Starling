@@ -338,6 +338,7 @@ impl Game<'_> {
             })
         })
     }
+}
 
 impl Game<'_> {
     /// Re-check a frozen preflight immediately before a future commit phase.
