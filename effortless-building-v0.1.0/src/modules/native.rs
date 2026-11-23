@@ -18,6 +18,10 @@ std::thread_local! {
         std::cell::RefCell::new(Vec::with_capacity(204));
     static PREVIEW_PLAN: std::cell::RefCell<Option<(crate::game::effortless_building::SelectionPoints, usize, Vec<[i32; 3]>)>> =
         std::cell::RefCell::new(None);
+    // Keep the exact validated world snapshot alive between the user's review
+    // and the future explicit confirmation/commit action.
+    static FROZEN_PREFLIGHT: std::cell::RefCell<Option<NativePreflightPlan>> =
+        std::cell::RefCell::new(None);
 }
 
 
@@ -77,6 +81,17 @@ pub(super) enum NativePreflightError {
 pub(super) fn reset_effortless_building_preview() {
     PREVIEW_PLAN.with(|cache| *cache.borrow_mut() = None);
     PREVIEW_LINES.with(|lines| lines.borrow_mut().clear());
+    clear_effortless_building_preflight();
+}
+
+/// Retain the exact read-only preflight snapshot; never reconstruct it from UI text.
+pub(super) fn store_effortless_building_preflight(plan: NativePreflightPlan) {
+    FROZEN_PREFLIGHT.with(|slot| *slot.borrow_mut() = Some(plan));
+}
+
+/// Invalidate a reviewed plan whenever its selection, tool, or world session changes.
+pub(super) fn clear_effortless_building_preflight() {
+    FROZEN_PREFLIGHT.with(|slot| *slot.borrow_mut() = None);
 }
 
 impl Game<'_> {
