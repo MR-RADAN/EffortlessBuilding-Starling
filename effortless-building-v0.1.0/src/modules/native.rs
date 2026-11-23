@@ -326,6 +326,20 @@ impl Game<'_> {
 }
 
 impl Game<'_> {
+    /// Validate the exact plan retained after the user reviewed the preflight.
+    /// No new target list is generated here and no world state is changed.
+    /// The cached plan remains available only if this check succeeds; callers
+    /// must still obtain a fresh explicit confirmation before any future write.
+    pub(super) fn effortless_building_frozen_preflight_is_current(&mut self) -> bool {
+        FROZEN_PREFLIGHT.with(|slot| {
+            let cached = slot.borrow();
+            cached.as_ref().is_some_and(|plan| {
+                self.effortless_building_preflight_is_current(plan)
+            })
+        })
+    }
+
+impl Game<'_> {
     /// Re-check a frozen preflight immediately before a future commit phase.
     /// This is deliberately read-only: it rejects stale selection, authority,
     /// world bounds, reach, unloaded chunks, and any block changed since capture.
