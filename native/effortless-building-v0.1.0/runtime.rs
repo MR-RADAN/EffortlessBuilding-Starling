@@ -4,6 +4,13 @@
 
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::Mutex;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+const DIAGNOSTIC_LOG_LIMIT: u64 = 256 * 1024;
+static DIAGNOSTIC_LOCK: Mutex<()> = Mutex::new(());
 
 pub const ID: &str = "effortless_building";
 pub const NAME: &str = "Effortless Building";
@@ -48,7 +55,64 @@ static SELECTION_POINTS: Mutex<SelectionPoints> = Mutex::new(SelectionPoints {
 
 /// Record a point from the authoritative in-game block ray pick.
 pub fn record_selection_point(pos: [i32; 3]) {
-    SELECTION_POINTS.lock().unwrap_or_else(|e| e.into_inner()).record(pos);
+    let selection = {
+        let mut current = SELECTION_POINTS.lock().unwrap_or_else(|e| e.into_inner());
+        current.record(pos);
+        *current
+    };
+    let _ = write_diagnostic(
+        "selection_point",
+        &format!("A={:?}; B={:?}", selection.first, selection.second),
+    );
+}
+
+/// Append a bounded diagnostic event to the game's shared config folder.
+/// The log is local-only; it is never uploaded or shared automatically.
+pub fn write_diagnostic(event: &str, detail: &str) -> Result<PathBuf, String> {
+    let _guard = DIAGNOSTIC_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let directory = crate::game::Game::native_config_dir().join("effortless_building");
+    fs::create_dir_all(&directory).map_err(|error| format!("create log directory: {error}"))?;
+    let path = directory.join("diagnostics.jsonl");
+    let previous = directory.join("diagnostics.previous.jsonl");
+
+    if fs::metadata(&path).map(|meta| meta.len() >= DIAGNOSTIC_LOG_LIMIT).unwrap_or(false) {
+        let _ = fs::remove_file(&previous);
+        fs::rename(&path, &previous).map_err(|error| format!("rotate diagnostic log: {error}"))?;
+    }
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let safe_event = json_escape(&event.chars().take(64).collect::<String>());
+    let safe_detail = json_escape(&detail.chars().take(2048).collect::<String>());
+    let line = format!(
+        "{{\\"time_unix_ms\\":{now},\\"mod\\":\\"{ID}\\",\\"version\\":\\"{VERSION}\\",\\"event\\":\\"{safe_event}\\",\\"detail\\":\\"{safe_detail}\\"}}\\n"
+    );
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|error| format!("open diagnostic log: {error}"))?;
+    file.write_all(line.as_bytes())
+        .map_err(|error| format!("write diagnostic log: {error}"))?;
+    Ok(path)
+}
+
+fn json_escape(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            '"' => escaped.push_str("\\\\""),
+            '\\\\' => escaped.push_str("\\\\\\\\"),
+            '\\n' => escaped.push_str("\\\\n"),
+            '\\r' => escaped.push_str("\\\\r"),
+            '\\t' => escaped.push_str("\\\\t"),
+            c if c.is_control() => escaped.push(' '),
+            c => escaped.push(c),
+        }
+    }
+    escaped
 }
 
 pub fn selection_points() -> SelectionPoints {
@@ -317,15 +381,18 @@ pub fn process_pending_ui_action(game: &mut crate::game::Game<'_>) {
     match PENDING_UI_ACTION.swap(NO_ACTION, Ordering::AcqRel) {
         action if (0..TOOLS.len() as i32).contains(&action) => {
             game.native_set_setting(ID, "tool", &action.to_string());
+            let _ = write_diagnostic("tool_selected", TOOLS[action as usize]);
         }
         ACTION_PREFLIGHT => {
             let status = match game.effortless_building_preflight_selection() {
                 Ok(plan) => format!("Preflight OK: {} targets validated; no blocks changed", plan.blocks.len()),
                 Err(error) => format!("Preflight failed: {error:?}"),
             };
+            let _ = write_diagnostic("preflight_result", &status);
             *PREFLIGHT_STATUS.lock().unwrap_or_else(|e| e.into_inner()) = status;
         }
         ACTION_CLOSE => {
+            let _ = write_diagnostic("builder_closed", "Builder screen closed");
             game.native_mod_screen_close(ID);
             CAPTURED_LEFT_PRESS.store(false, Ordering::Release);
         }
