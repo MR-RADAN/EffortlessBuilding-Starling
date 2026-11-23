@@ -1,6 +1,6 @@
 # Effortless Building — Starling Edition
 
-- Project version: 1.2.0
+- Project version: 1.2.1
 - Native bundle version: 0.1.0
 - Port maintainer / native bundle creator: MR
 - Upstream author: Requios
@@ -22,6 +22,10 @@ A separate read-only world-render hook draws a selection wireframe plus up to
 target-position count and flags selections above the 16,384-position core
 limit. These previews do not read block states or modify the world. The
 selection and render hooks are awaiting native build validation.
+
+## Local diagnostics
+
+The native runtime records selection points, tool changes, read-only preflight results and builder-close events to `config/effortless_building/diagnostics.jsonl`. The active log is capped at 256 KiB with one rotated previous file; logging is local-only and never uploaded. See [docs/DIAGNOSTICS.md](docs/DIAGNOSTICS.md) for collection and sharing instructions.
 
 ## Implemented in the pure Rust core
 
@@ -68,6 +72,6 @@ implementation.
 - Runtime testing in Starling 0.9.0 on Android/POCO F5.
 - Launcher build-service import validation and a tested release package.
 
-See [docs/PORTING-STATUS.md](docs/PORTING-STATUS.md),
+See [docs/DIAGNOSTICS.md](docs/DIAGNOSTICS.md), [docs/PORTING-STATUS.md](docs/PORTING-STATUS.md),
 [docs/STARLING-0.9.0-COMPATIBILITY-AUDIT.md](docs/STARLING-0.9.0-COMPATIBILITY-AUDIT.md),
 and [docs/WORLD-EDIT-ADAPTER-CONTRACT.md](docs/WORLD-EDIT-ADAPTER-CONTRACT.md).

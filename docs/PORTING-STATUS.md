@@ -1,4 +1,4 @@
-# Porting status — project 1.2.0 / native bundle 0.1.0
+# Porting status — project 1.2.1 / native bundle 0.1.0
 
 ## Pinned target
 
@@ -156,3 +156,12 @@ this package is Starling's built-in Wrench implementation: its cancellable
 extend that exact pattern with complete preflight, snapshots, explicit user
 confirmation, guarded partial-failure recovery, and conflict-safe history.
 Do not add fake `ServerHost` parameters or claim atomic transactions.
+
+
+## Local diagnostic logging added (source-level)
+
+- Runtime writes JSONL events through `Game::native_config_dir()` to `config/effortless_building/diagnostics.jsonl`.
+- Events: selection-point capture (including coordinates), tool selection, read-only preflight result and builder close.
+- Active file rotates at 256 KiB; one previous file is retained. Detail is capped at 2,048 characters per event.
+- No automatic upload or sharing. Collection instructions are in `docs/DIAGNOSTICS.md`.
+- This is source-level only until the Starling 0.9.0 ARM64 build succeeds and the file is verified on-device.
